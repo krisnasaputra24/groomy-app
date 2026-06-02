@@ -37,12 +37,12 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.krisna.groomy.components.BannerView
-import com.krisna.groomy.components.Headerview
 import com.krisna.groomy.components.ThreeStageProgressIndicator
 import com.krisna.groomy.model.GroomerService
 import com.krisna.groomy.model.PromoResponse
 import com.krisna.groomy.model.ServiceResponse
-import com.krisna.groomy.model.BookingResponse
+import com.krisna.groomy.model.OrderResponse
+import com.krisna.groomy.model.OrderStatus
 import android.content.Intent
 import android.net.Uri
 
@@ -78,8 +78,8 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
     val activePromos = remember { mutableStateListOf<PromoResponse>() }
     var isLoadingPromos by remember { mutableStateOf(true) }
     
-    var activeBooking by remember { mutableStateOf<BookingResponse?>(null) }
-    var isLoadingActiveBooking by remember { mutableStateOf(false) }
+    var activeOrder by remember { mutableStateOf<OrderResponse?>(null) }
+    var isLoadingActiveOrder by remember { mutableStateOf(false) }
 
     // Fungsi untuk memformat URL Foto (Sama seperti di Profile & EditProfile)
     fun formatPhotoUrl(rawUrl: String?): String? {
@@ -127,15 +127,12 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
         scope.launch {
             try {
                 isLoadingPromos = true
-                val response = if (token != null) {
-                    RetrofitClient.instance.getAllPromos("Bearer $token")
-                } else {
-                    null
-                }
-                
-                if (response?.isSuccessful == true) {
-                    activePromos.clear()
-                    response.body()?.let { activePromos.addAll(it) }
+                if (token != null) {
+                    val response = RetrofitClient.instance.getAllPromos("Bearer $token")
+                    if (response.isSuccessful) {
+                        activePromos.clear()
+                        response.body()?.let { activePromos.addAll(it) }
+                    }
                 }
             } catch (e: Exception) { }
             finally {
@@ -144,28 +141,22 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
         }
     }
 
-    fun fetchActiveBooking() {
+    fun fetchActiveOrder() {
         val savedToken = prefManager.getToken()
         if (savedToken != null) {
             scope.launch {
                 try {
-                    isLoadingActiveBooking = true
-                    val profileRes = RetrofitClient.instance.getProfile("Bearer $savedToken")
-                    if (profileRes.isSuccessful) {
-                        val userId = profileRes.body()?.id
-                        if (userId != null) {
-                            val response = RetrofitClient.instance.getAllBookings("Bearer $savedToken", userId = userId)
-                            if (response.isSuccessful) {
-                                // Ambil booking terbaru yang statusnya bukan COMPLETED atau REJECTED
-                                activeBooking = response.body()?.firstOrNull { 
-                                    it.status?.name != "COMPLETED" && it.status?.name != "REJECTED"
-                                }
-                            }
+                    isLoadingActiveOrder = true
+                    val response = RetrofitClient.instance.getAllOrders("Bearer $savedToken")
+                    if (response.isSuccessful) {
+                        // Ambil order terbaru yang statusnya bukan COMPLETED atau CANCELLED
+                        activeOrder = response.body()?.firstOrNull { 
+                            it.status != OrderStatus.COMPLETED && it.status != OrderStatus.CANCELLED
                         }
                     }
                 } catch (e: Exception) { }
                 finally {
-                    isLoadingActiveBooking = false
+                    isLoadingActiveOrder = false
                 }
             }
         }
@@ -175,7 +166,7 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
     LaunchedEffect(Unit) {
         fetchProfile()
         fetchAllServices()
-        fetchActiveBooking()
+        fetchActiveOrder()
         fetchPromos()
     }
 
@@ -185,7 +176,7 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
             if (event == Lifecycle.Event.ON_RESUME) {
                 fetchProfile()
                 fetchAllServices()
-                fetchActiveBooking()
+                fetchActiveOrder()
                 fetchPromos()
             }
         }
@@ -239,7 +230,6 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Profile Photo Placeholder
                         Box(
                             modifier = Modifier
                                 .size(54.dp)
@@ -291,7 +281,6 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
                 }
             }
 
-            // 2. Search Bar
             item {
                 OutlinedTextField(
                     value = searchQuery,
@@ -316,24 +305,24 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
                 )
             }
 
-            // 3. Banner
             item {
                 BannerView(promos = promoBanners)
             }
 
-            // 3.5 Active Grooming Status
-            if (activeBooking != null) {
+            if (activeOrder != null) {
                 item {
                     ActiveGroomingCard(
-                        petName = activeBooking?.service?.name ?: "Pet",
-                        status = activeBooking?.status?.name ?: "PENDING",
-                        progress = 0.5f, // Handled by 3-stage indicator internally
-                        groomerPhone = activeBooking?.groomer?.phone
+                        petName = activeOrder?.service?.name ?: "Pet",
+                        status = activeOrder?.status?.name ?: "PENDING",
+                        progress = 0.5f,
+                        groomerPhone = activeOrder?.groomer?.phone,
+                        onChatClick = {
+                            navController.navigate("chat/${activeOrder?.id}/${activeOrder?.groomerId}/${activeOrder?.groomer?.name ?: "Groomer"}")
+                        }
                     )
                 }
             }
 
-            // 4. Recommendation Section (Dynamic from Services)
             item {
                 RecommendationCardLight(
                     title = "Layanan Terbaru",
@@ -362,7 +351,6 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
                 }
             }
 
-            // 5. ML Jadwal (Still Placeholder)
             item {
                 RecommendationCardLight(
                     title = "Jadwal Terdekat",
@@ -377,7 +365,6 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
                 }
             }
 
-            // 6. Care Insight
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -424,18 +411,27 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
 }
 
 @Composable
-fun ActiveGroomingCard(petName: String, status: String, progress: Float, groomerPhone: String? = null) {
+fun ActiveGroomingCard(
+    petName: String, 
+    status: String, 
+    progress: Float, 
+    groomerPhone: String? = null,
+    onChatClick: () -> Unit
+) {
     val context = LocalContext.current
-    val statusColor = when (status) {
-        "In Progress" -> Color(0xFF257DEF)
+    val statusColor = when (status.uppercase()) {
+        "CONFIRMED", "IN_PROGRESS" -> Color(0xFF257DEF)
         "READY_FOR_PICKUP" -> Color(0xFFEA580C)
+        "COMPLETED" -> Color(0xFF10B981)
         else -> Color(0xFF64748B)
     }
 
-    val statusText = when (status) {
-        "ACCEPTED" -> "Pesanan Diterima"
+    val statusText = when (status.uppercase()) {
+        "PENDING" -> "Menunggu Konfirmasi"
+        "CONFIRMED" -> "Sedang Dimandikan"
         "IN_PROGRESS" -> "Sedang Dimandikan"
-        "READY_FOR_PICKUP" -> "Siap Dijemput ✨"
+        "READY_FOR_PICKUP" -> "Siap Dijemput"
+        "COMPLETED" -> "Selesai"
         else -> status
     }
 
@@ -485,6 +481,23 @@ fun ActiveGroomingCard(petName: String, status: String, progress: Float, groomer
                 }
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = { onChatClick() },
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF257DEF).copy(alpha = 0.1f))
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Chat,
+                            contentDescription = "Internal Chat",
+                            tint = Color(0xFF257DEF),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.width(8.dp))
+
                     if (!groomerPhone.isNullOrBlank()) {
                         IconButton(
                             onClick = {
@@ -507,25 +520,10 @@ fun ActiveGroomingCard(petName: String, status: String, progress: Float, groomer
                             )
                         }
                     }
-
-                    if (status == "READY_FOR_PICKUP") {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(
-                            onClick = { /* Navigasi ke Maps jika perlu */ },
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                            modifier = Modifier.height(32.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEA580C)),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text("Jemput", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-            
-            // Unified 3-Stage Progress Indicator
             ThreeStageProgressIndicator(status)
         }
     }

@@ -75,7 +75,7 @@ fun GroomerPromoManagementPage(navController: NavController) {
         }
     }
 
-    fun deletePromo(id: Int) {
+    fun deletePromoItem(id: Int) {
         val token = prefManager.getToken()
         if (token != null) {
             scope.launch {
@@ -136,7 +136,7 @@ fun GroomerPromoManagementPage(navController: NavController) {
                         PromoItemCard(
                             promo = promo,
                             onEdit = { editingPromo = promo },
-                            onDelete = { deletePromo(promo.id) }
+                            onDelete = { deletePromoItem(promo.id) }
                         )
                     }
                 }

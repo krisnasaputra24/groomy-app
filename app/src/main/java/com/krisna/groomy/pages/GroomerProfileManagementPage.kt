@@ -348,6 +348,9 @@ fun GroomerProfileManagementPage(navController: NavController) {
                     onDelete = {
                         serviceToDelete = service
                         showDeleteConfirm = true
+                    },
+                    onAddPromo = {
+                        navController.navigate("groomer_promo_management")
                     }
                 )
             }
@@ -410,7 +413,8 @@ fun GroomerProfileManagementPage(navController: NavController) {
 fun EditableServiceCard(
     service: ServiceResponse,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onAddPromo: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -418,54 +422,79 @@ fun EditableServiceCard(
         colors = CardDefaults.cardColors(containerColor = Color.White),
         border = BorderStroke(1.dp, Color(0xFFF1F5F9))
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(60.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFFF1F5F9)),
-                contentAlignment = Alignment.Center
+        Column {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                val url = if (service.photo.isNullOrBlank()) null 
-                else if (service.photo.startsWith("http")) service.photo 
-                else "https://groomy-sigma.vercel.app/${service.photo}"
+                Box(
+                    modifier = Modifier
+                        .size(60.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFFF1F5F9)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val url = if (service.photo.isNullOrBlank()) null 
+                    else if (service.photo.startsWith("http")) service.photo 
+                    else "https://groomy-sigma.vercel.app/${service.photo}"
 
-                if (url != null) {
-                    AsyncImage(
-                        model = url,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
+                    if (url != null) {
+                        AsyncImage(
+                            model = url,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(Icons.Default.Image, contentDescription = null, tint = Color(0xFF94A3B8))
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = service.name,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = Color(0xFF1E293B),
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
-                } else {
-                    Icon(Icons.Default.Image, contentDescription = null, tint = Color(0xFF94A3B8))
+                    Text(text = "Rp ${service.price.toInt()}", fontWeight = FontWeight.ExtraBold, fontSize = 14.sp, color = Color(0xFF257DEF))
+                    Text(text = service.description, fontSize = 12.sp, color = Color(0xFF64748B), maxLines = 1)
+                }
+
+                Row {
+                    IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color(0xFF64748B), modifier = Modifier.size(18.dp))
+                    }
+                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFEF4444), modifier = Modifier.size(18.dp))
+                    }
                 }
             }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = service.name,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = Color(0xFF1E293B),
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                )
-                Text(text = "Rp ${service.price.toInt()}", fontWeight = FontWeight.ExtraBold, fontSize = 14.sp, color = Color(0xFF257DEF))
-                Text(text = service.description, fontSize = 12.sp, color = Color(0xFF64748B), maxLines = 1)
-            }
-
-            Row {
-                IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color(0xFF64748B), modifier = Modifier.size(18.dp))
-                }
-                IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFEF4444), modifier = Modifier.size(18.dp))
+            
+            // Promo Shortcut Button
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onAddPromo() },
+                color = Color(0xFF257DEF).copy(alpha = 0.05f)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(Icons.Default.Percent, contentDescription = null, tint = Color(0xFF257DEF), modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "Kelola Promo Layanan Ini",
+                        color = Color(0xFF257DEF),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
@@ -547,11 +576,19 @@ fun ServiceEditDialog(
                         isLoading = true
                         scope.launch {
                             try {
+                                Log.d("DEBUG_API", "Confirm Service Save: Fetching profile to get Groomer ID")
                                 val userRes = RetrofitClient.instance.getProfile("Bearer $token")
+                                if (!userRes.isSuccessful) {
+                                    Toast.makeText(context, "Gagal ambil profil: ${userRes.code()}", Toast.LENGTH_SHORT).show()
+                                    isLoading = false
+                                    return@launch
+                                }
+                                
                                 val activeGroomerId = userRes.body()?.groomers?.firstOrNull()?.id ?: 0
+                                Log.d("DEBUG_API", "Active Groomer ID found: $activeGroomerId")
 
                                 if (activeGroomerId == 0) {
-                                    Toast.makeText(context, "Gagal mendapatkan ID Groomer", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "ID Groomer belum aktif. Harap lengkapi pendaftaran.", Toast.LENGTH_LONG).show()
                                     isLoading = false
                                     return@launch
                                 }
@@ -568,6 +605,7 @@ fun ServiceEditDialog(
                                     photoPart = MultipartBody.Part.createFormData("photo", file.name, requestFile)
                                 }
 
+                                Log.d("DEBUG_API", "Calling add/update service API...")
                                 val response = if (service == null) {
                                     RetrofitClient.instance.addService("Bearer $token", namePart, descPart, pricePart, groomerIdPart, photoPart)
                                 } else {
@@ -575,13 +613,14 @@ fun ServiceEditDialog(
                                 }
 
                                 if (response.isSuccessful) {
+                                    Log.d("DEBUG_API", "Service saved successfully")
                                     Toast.makeText(context, "Berhasil disimpan!", Toast.LENGTH_SHORT).show()
                                     onSave()
                                     onDismiss()
                                 } else {
                                     val errorBody = response.errorBody()?.string()
                                     Log.e("DEBUG_API", "Service Save Error: code=${response.code()}, body=$errorBody")
-                                    Toast.makeText(context, "Gagal: $errorBody", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(context, "Gagal (${response.code()}): $errorBody", Toast.LENGTH_LONG).show()
                                 }
                             } catch (e: Exception) {
                                 Log.e("DEBUG_API", "Error in Service Save: ${e.message}")

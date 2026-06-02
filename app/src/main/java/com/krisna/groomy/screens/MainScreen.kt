@@ -75,7 +75,7 @@ fun MainScreen(modifier: Modifier = Modifier, navController: NavController) {
             Box(modifier = Modifier.weight(1f)) {
                 when (selectedItem) {
                     0 -> Beranda(navController = navController)
-                    1 -> History()
+                    1 -> History(navController = navController)
                     2 -> Layanan(navController = navController)
                     3 -> Profile(navController = navController)
                 }

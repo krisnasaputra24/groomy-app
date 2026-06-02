@@ -20,9 +20,9 @@ import androidx.compose.ui.unit.sp
 fun ThreeStageProgressIndicator(status: String) {
     val stages = listOf("Dalam Antrean", "Proses Grooming", "Selesai")
     val activeIndex = when (status.uppercase()) {
-        "PENDING", "ACCEPTED", "SCHEDULED" -> 0
-        "IN_PROGRESS" -> 1
-        "READY_FOR_PICKUP", "COMPLETED" -> 2
+        "PENDING" -> 0
+        "CONFIRMED", "IN_PROGRESS" -> 1
+        "COMPLETED" -> 2
         else -> 0
     }
 

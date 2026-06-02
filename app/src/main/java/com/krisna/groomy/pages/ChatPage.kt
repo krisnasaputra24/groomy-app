@@ -37,14 +37,25 @@ fun ChatPage(navController: NavController, orderId: Int, groomerId: Int, userNam
     val chats = remember { mutableStateListOf<ChatResponse>() }
     var messageText by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(true) }
+    var currentUserRole by remember { mutableStateOf<String?>(null) }
+    var isSending by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
-    fun fetchChats() {
+    fun fetchProfileAndChats() {
         val token = prefManager.getToken()
         if (token != null) {
             scope.launch {
                 try {
-                    // Berdasarkan dokumentasi terbaru, gunakan endpoint /orders/:orderId/chats
+                    // Fetch profile once to determine role
+                    if (currentUserRole == null) {
+                        val profileRes = RetrofitClient.instance.getProfile("Bearer $token")
+                        if (profileRes.isSuccessful) {
+                            val profile = profileRes.body()
+                            currentUserRole = if (profile?.groomers?.isNotEmpty() == true) "GROOMER" else "USER"
+                        }
+                    }
+
+                    // Fetch chats using endpoint /orders/:orderId/chats
                     val response = RetrofitClient.instance.getOrderChats(
                         "Bearer $token",
                         orderId = orderId
@@ -54,7 +65,6 @@ fun ChatPage(navController: NavController, orderId: Int, groomerId: Int, userNam
                         if (body.size != chats.size) {
                             chats.clear()
                             chats.addAll(body)
-                            // Scroll ke bawah jika ada pesan baru
                             if (chats.isNotEmpty()) {
                                 listState.animateScrollToItem(chats.size - 1)
                             }
@@ -71,22 +81,36 @@ fun ChatPage(navController: NavController, orderId: Int, groomerId: Int, userNam
 
     fun sendMessage() {
         if (messageText.isBlank()) return
-        
+
         val token = prefManager.getToken()
-        if (token != null) {
-            scope.launch {
-                try {
-                    val response = RetrofitClient.instance.createChat(
-                        "Bearer $token",
-                        ChatRequest(messageText, groomerId, orderId)
-                    )
-                    if (response.isSuccessful) {
-                        messageText = ""
-                        fetchChats()
-                    }
-                } catch (e: Exception) {
-                    Toast.makeText(context, "Gagal mengirim pesan", Toast.LENGTH_SHORT).show()
+        if (token == null) {
+            Toast.makeText(context, "Sesi berakhir", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        scope.launch {
+            try {
+                isSending = true
+                
+                val request = ChatRequest(
+                    message = messageText,
+                    groomerId = groomerId,
+                    orderId = if (orderId != 0) orderId else null
+                )
+
+                val response = RetrofitClient.instance.createChat("Bearer $token", request)
+
+                if (response.isSuccessful) {
+                    messageText = ""
+                    fetchProfileAndChats()
+                } else {
+                    val errorJson = response.errorBody()?.string()
+                    Toast.makeText(context, "Gagal mengirim: $errorJson", Toast.LENGTH_LONG).show()
                 }
+            } catch (e: Exception) {
+                Toast.makeText(context, "Koneksi Error: ${e.message}", Toast.LENGTH_SHORT).show()
+            } finally {
+                isSending = false
             }
         }
     }
@@ -94,7 +118,7 @@ fun ChatPage(navController: NavController, orderId: Int, groomerId: Int, userNam
     // Polling setiap 3 detik
     LaunchedEffect(Unit) {
         while(true) {
-            fetchChats()
+            fetchProfileAndChats()
             delay(3000)
         }
     }
@@ -132,18 +156,25 @@ fun ChatPage(navController: NavController, orderId: Int, groomerId: Int, userNam
                         modifier = Modifier.weight(1f),
                         placeholder = { Text("Tulis pesan...") },
                         shape = RoundedCornerShape(24.dp),
-                        maxLines = 3
+                        maxLines = 3,
+                        enabled = !isSending
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     IconButton(
                         onClick = { sendMessage() },
+                        enabled = !isSending && messageText.isNotBlank(),
                         colors = IconButtonDefaults.iconButtonColors(
                             containerColor = Color(0xFF257DEF),
-                            contentColor = Color.White
+                            contentColor = Color.White,
+                            disabledContainerColor = Color.LightGray
                         ),
                         modifier = Modifier.size(48.dp)
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
+                        if (isSending) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
+                        }
                     }
                 }
             }
@@ -167,9 +198,7 @@ fun ChatPage(navController: NavController, orderId: Int, groomerId: Int, userNam
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(chats) { chat ->
-                        // Logika sederhana: jika nama user adalah "Admin" atau nama groomer, anggap me?
-                        // Berdasarkan JSON, user "Admin" atau field "groomer" terisi menunjukkan pengirim
-                        val isMe = chat.user?.name == "Admin" || chat.groomer != null
+                        val isMe = chat.sender == currentUserRole
                         
                         Box(
                             modifier = Modifier.fillMaxWidth(),
@@ -186,6 +215,16 @@ fun ChatPage(navController: NavController, orderId: Int, groomerId: Int, userNam
                                 tonalElevation = 1.dp
                             ) {
                                 Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                                    if (!isMe && chat.senderName != null) {
+                                        Text(
+                                            text = chat.senderName,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 10.sp,
+                                            color = Color(0xFF257DEF)
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                    }
+
                                     Text(
                                         text = chat.message,
                                         color = if (isMe) Color.White else Color.Black,

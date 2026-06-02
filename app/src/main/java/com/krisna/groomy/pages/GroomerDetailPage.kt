@@ -36,7 +36,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.krisna.groomy.api.RetrofitClient
-import com.krisna.groomy.model.BookingRequest
+import com.krisna.groomy.model.CreateOrderRequest
 import com.krisna.groomy.model.GroomerResponse
 import com.krisna.groomy.model.PetResponse
 import com.krisna.groomy.model.ServiceResponse
@@ -78,18 +78,15 @@ fun GroomerDetailPage(
             scope.launch {
                 try {
                     isLoading = true
-                    // 1. Fetch Groomer Info
                     val groomerRes = RetrofitClient.instance.getGroomerById("Bearer $token", groomerId)
                     if (groomerRes.isSuccessful) groomerInfo = groomerRes.body()
 
-                    // 2. Fetch Services
                     val servicesRes = RetrofitClient.instance.getAllServices(groomerId)
                     if (servicesRes.isSuccessful) {
                         services.clear()
                         servicesRes.body()?.let { services.addAll(it) }
                     }
                     
-                    // 3. Fetch User's Pets for Selection
                     val petsRes = RetrofitClient.instance.getAllPets("Bearer $token")
                     if (petsRes.isSuccessful) {
                         pets.clear()
@@ -137,7 +134,6 @@ fun GroomerDetailPage(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Header Salon
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -180,7 +176,6 @@ fun GroomerDetailPage(
                     }
                 }
 
-                // 1. Pilihan Hewan
                 item {
                     Text("Pilih Hewan Peliharaan", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
                     Spacer(modifier = Modifier.height(12.dp))
@@ -199,7 +194,6 @@ fun GroomerDetailPage(
                     }
                 }
 
-                // 2. Pilih Waktu
                 item {
                     Text("Waktu Kedatangan", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
                     Row(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -212,7 +206,6 @@ fun GroomerDetailPage(
                     }
                 }
 
-                // 3. Pilihan Layanan
                 item {
                     Text("Pilih Layanan", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
                 }
@@ -230,20 +223,20 @@ fun GroomerDetailPage(
                     Button(
                         onClick = { 
                             val token = prefManager.getToken()
-                            if (token != null && selectedService != null && selectedPet != null && selectedDate.isNotEmpty() && selectedTime.isNotEmpty()) {
+                            if (token != null && selectedService != null && selectedDate.isNotEmpty() && selectedTime.isNotEmpty()) {
                                 isBookingLoading = true
                                 scope.launch {
                                     try {
-                                        val request = BookingRequest(
+                                        val request = CreateOrderRequest(
                                             date = selectedDate,
                                             time = selectedTime,
                                             groomerId = groomerId,
                                             serviceId = selectedService!!.id,
-                                            petId = selectedPet!!.id
+                                            petId = selectedPet?.id
                                         )
-                                        val response = RetrofitClient.instance.createBooking("Bearer $token", request)
+                                        val response = RetrofitClient.instance.createOrder("Bearer $token", request)
                                         if (response.isSuccessful) {
-                                            Toast.makeText(context, "Booking Berhasil!", Toast.LENGTH_LONG).show()
+                                            Toast.makeText(context, "Pesanan Berhasil!", Toast.LENGTH_LONG).show()
                                             navController.navigate("home") { popUpTo("home") { inclusive = true } }
                                         } else {
                                             Toast.makeText(context, "Gagal: ${response.errorBody()?.string()}", Toast.LENGTH_LONG).show()
@@ -258,13 +251,13 @@ fun GroomerDetailPage(
                                 Toast.makeText(context, "Harap lengkapi semua pilihan", Toast.LENGTH_SHORT).show()
                             }
                         },
-                        enabled = selectedService != null && selectedPet != null && selectedDate.isNotEmpty() && !isBookingLoading,
+                        enabled = selectedService != null && selectedDate.isNotEmpty() && !isBookingLoading,
                         modifier = Modifier.fillMaxWidth().height(56.dp),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF257DEF))
                     ) {
                         if (isBookingLoading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                        else Text("Konfirmasi Booking", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        else Text("Konfirmasi Pesanan", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }

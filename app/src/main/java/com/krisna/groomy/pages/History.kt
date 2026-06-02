@@ -7,9 +7,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,22 +18,22 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
 import com.krisna.groomy.api.RetrofitClient
-import com.krisna.groomy.model.BookingResponse
+import com.krisna.groomy.model.OrderResponse
+import com.krisna.groomy.model.OrderStatus
 import com.krisna.groomy.utils.PrefManager
 import kotlinx.coroutines.launch
 
 @Composable
-fun History() {
+fun History(navController: NavController) {
     val context = LocalContext.current
     val prefManager = remember { PrefManager(context) }
     val scope = rememberCoroutineScope()
     
-    val historyItems = remember { mutableStateListOf<BookingResponse>() }
+    val historyItems = remember { mutableStateListOf<OrderResponse>() }
     var isLoading by remember { mutableStateOf(true) }
     
-    // Track rated bookings locally or assume if rating exists in response
-    // (Note: Using a simple Map to simulate local tracking of 'isRated')
     val ratedBookings = remember { mutableStateMapOf<Int, Boolean>() }
 
     fun fetchHistory() {
@@ -43,15 +42,11 @@ fun History() {
             scope.launch {
                 try {
                     isLoading = true
-                    val profileRes = RetrofitClient.instance.getProfile("Bearer $token")
-                    val userId = profileRes.body()?.id
-                    if (userId != null) {
-                        val response = RetrofitClient.instance.getAllBookings("Bearer $token", userId = userId)
-                        if (response.isSuccessful) {
-                            historyItems.clear()
-                            response.body()?.let { list ->
-                                historyItems.addAll(list.sortedByDescending { it.updatedAt })
-                            }
+                    val response = RetrofitClient.instance.getAllOrders("Bearer $token")
+                    if (response.isSuccessful) {
+                        historyItems.clear()
+                        response.body()?.let { list ->
+                            historyItems.addAll(list.sortedByDescending { it.createdAt })
                         }
                     }
                 } catch (e: Exception) {
@@ -92,11 +87,14 @@ fun History() {
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(historyItems) { booking ->
+                items(historyItems) { order ->
                     HistoryItemCard(
-                        booking = booking,
-                        isRated = ratedBookings[booking.id] ?: false, // Check if rated in this session
-                        onRateSuccess = { ratedBookings[booking.id] = true }
+                        order = order,
+                        isRated = ratedBookings[order.id] ?: false,
+                        onRateSuccess = { ratedBookings[order.id] = true },
+                        onChatClick = {
+                            navController.navigate("chat/${order.id}/${order.groomerId}/${order.groomer?.name ?: "Groomer"}")
+                        }
                     )
                 }
             }
@@ -105,12 +103,17 @@ fun History() {
 }
 
 @Composable
-fun HistoryItemCard(booking: BookingResponse, isRated: Boolean, onRateSuccess: () -> Unit) {
-    val status = booking.status?.name ?: "UNKNOWN"
-    val isCompleted = status == "COMPLETED"
+fun HistoryItemCard(
+    order: OrderResponse, 
+    isRated: Boolean, 
+    onRateSuccess: () -> Unit,
+    onChatClick: () -> Unit
+) {
+    val status = order.status ?: OrderStatus.PENDING
+    val isCompleted = status == OrderStatus.COMPLETED
     val statusColor = when(status) {
-        "COMPLETED" -> Color(0xFF10B981)
-        "REJECTED" -> Color(0xFFEF4444)
+        OrderStatus.COMPLETED -> Color(0xFF10B981)
+        OrderStatus.CANCELLED -> Color(0xFFEF4444)
         else -> Color(0xFF3B82F6)
     }
 
@@ -129,7 +132,7 @@ fun HistoryItemCard(booking: BookingResponse, isRated: Boolean, onRateSuccess: (
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        text = status,
+                        text = status.name,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         color = statusColor,
                         fontSize = 10.sp,
@@ -137,18 +140,32 @@ fun HistoryItemCard(booking: BookingResponse, isRated: Boolean, onRateSuccess: (
                     )
                 }
                 Spacer(modifier = Modifier.weight(1f))
-                Text(booking.date.take(10), fontSize = 12.sp, color = Color.Gray)
+                
+                IconButton(
+                    onClick = { onChatClick() },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Chat,
+                        contentDescription = "Chat",
+                        tint = Color(0xFF257DEF),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(order.date.take(10), fontSize = 12.sp, color = Color.Gray)
             }
 
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = booking.service?.name ?: "Layanan Grooming",
+                text = order.service?.name ?: "Layanan",
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
                 color = Color(0xFF1E293B)
             )
             Text(
-                text = "Groomer: ${booking.groomer?.name ?: "Professional"}",
+                text = "Groomer: ${order.groomer?.name ?: "Professional"}",
                 fontSize = 14.sp,
                 color = Color(0xFF64748B)
             )
@@ -158,7 +175,6 @@ fun HistoryItemCard(booking: BookingResponse, isRated: Boolean, onRateSuccess: (
                 HorizontalDivider(color = Color(0xFFF1F5F9))
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Logika Rating: Hanya tampil jika belum dirating
                 if (!isRated) {
                     Button(
                         onClick = { showRatingDialog = true },
@@ -177,7 +193,9 @@ fun HistoryItemCard(booking: BookingResponse, isRated: Boolean, onRateSuccess: (
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Terima kasih atas ulasan Anda! ✨", color = Color(0xFF10B981))
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Terima kasih!", color = Color(0xFF10B981))
                     }
                 }
             }
@@ -186,7 +204,7 @@ fun HistoryItemCard(booking: BookingResponse, isRated: Boolean, onRateSuccess: (
 
     if (showRatingDialog) {
         RatingDialog(
-            groomerId = booking.groomerId,
+            groomerId = order.groomerId,
             onDismiss = { showRatingDialog = false },
             onSuccess = {
                 showRatingDialog = false
@@ -198,7 +216,8 @@ fun HistoryItemCard(booking: BookingResponse, isRated: Boolean, onRateSuccess: (
 
 @Composable
 fun RatingDialog(groomerId: Int, onDismiss: () -> Unit, onSuccess: () -> Unit) {
-    var rating by remember { mutableStateOf(5) }
+    var rating by remember { mutableIntStateOf(5) }
+    var reviewMessage by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val prefManager = remember { PrefManager(context) }
@@ -206,10 +225,10 @@ fun RatingDialog(groomerId: Int, onDismiss: () -> Unit, onSuccess: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Beri Rating Groomer") },
+        title = { Text("Beri Rating & Ulasan") },
         text = {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                Text("Bagaimana pengalaman Anda?", color = Color.Gray)
+                Text("Bagaimana pengalaman Anda?", color = Color.Gray, fontSize = 14.sp)
                 Spacer(modifier = Modifier.height(16.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     for (i in 1..5) {
@@ -218,11 +237,22 @@ fun RatingDialog(groomerId: Int, onDismiss: () -> Unit, onSuccess: () -> Unit) {
                                 imageVector = if (i <= rating) Icons.Default.Star else Icons.Default.StarBorder,
                                 contentDescription = null,
                                 tint = if (i <= rating) Color(0xFFFFB800) else Color.LightGray,
-                                modifier = Modifier.size(32.dp)
+                                modifier = Modifier.size(36.dp)
                             )
                         }
                     }
                 }
+                Spacer(modifier = Modifier.height(24.dp))
+                OutlinedTextField(
+                    value = reviewMessage,
+                    onValueChange = { reviewMessage = it },
+                    label = { Text("Tulis ulasan Anda (Opsional)") },
+                    placeholder = { Text("Ceritakan pengalaman Anda...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                    maxLines = 5,
+                    shape = RoundedCornerShape(12.dp)
+                )
             }
         },
         confirmButton = {
@@ -236,14 +266,19 @@ fun RatingDialog(groomerId: Int, onDismiss: () -> Unit, onSuccess: () -> Unit) {
                                 val response = RetrofitClient.instance.rateGroomer(
                                     "Bearer $token",
                                     groomerId,
-                                    mapOf("rating" to rating)
+                                    com.krisna.groomy.model.RatingRequest(
+                                        rating = rating,
+                                        message = reviewMessage
+                                    )
                                 )
                                 if (response.isSuccessful) {
-                                    Toast.makeText(context, "Terima kasih atas ratingnya!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Terima kasih atas ulasannya!", Toast.LENGTH_SHORT).show()
                                     onSuccess()
+                                } else {
+                                    Toast.makeText(context, "Gagal: ${response.code()}", Toast.LENGTH_SHORT).show()
                                 }
                             } catch (e: Exception) {
-                                Toast.makeText(context, "Gagal mengirim rating", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Koneksi error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
                             } finally {
                                 isSubmitting = false
                             }
@@ -251,10 +286,11 @@ fun RatingDialog(groomerId: Int, onDismiss: () -> Unit, onSuccess: () -> Unit) {
                     }
                 },
                 enabled = !isSubmitting,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF257DEF))
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF257DEF)),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                if (isSubmitting) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White)
-                else Text("Kirim")
+                if (isSubmitting) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                else Text("Kirim Ulasan")
             }
         },
         dismissButton = {

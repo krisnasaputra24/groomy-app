@@ -30,8 +30,10 @@ data class ChatResponse(
     val user: ChatUser? = null,
     @SerializedName("groomer")
     val groomer: ChatGroomer? = null,
-    @SerializedName("senderRole")
-    val senderRole: String? = null // Handled manually if not in JSON
+    @SerializedName("sender")
+    val sender: String? = null, // "USER" or "GROOMER"
+    @SerializedName("senderName")
+    val senderName: String? = null
 )
 
 data class ChatUser(

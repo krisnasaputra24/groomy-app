@@ -244,8 +244,14 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController) {
                                     Toast.makeText(currentContext, "Login Berhasil, tapi token tidak ditemukan", Toast.LENGTH_SHORT).show()
                                 }
                             } else {
-                                val errorMsg = response.errorBody()?.string() ?: response.message()
-                                Toast.makeText(currentContext, "Login Gagal: $errorMsg", Toast.LENGTH_LONG).show()
+                                // Parsing error message dari body (misal: "Credentials incorrect")
+                                val errorBody = response.errorBody()?.string()
+                                val errorMsg = if (errorBody?.contains("\"message\":") == true) {
+                                    errorBody.substringAfter("\"message\":\"").substringBefore("\"")
+                                } else {
+                                    response.message().ifEmpty { "Login Gagal (Error ${response.code()})" }
+                                }
+                                Toast.makeText(currentContext, errorMsg, Toast.LENGTH_LONG).show()
                             }
                         } catch (e: Exception) {
                             Toast.makeText(currentContext, "Error: ${e.localizedMessage}", Toast.LENGTH_LONG).show()

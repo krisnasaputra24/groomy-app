@@ -192,7 +192,7 @@ fun Layanan(modifier: Modifier = Modifier, navController: NavController) {
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    val menus = listOf("Layanan Populer", "Groomer Terdekat")
+                    val menus = listOf("Layanan Populer", "Promo", "Groomer Terdekat")
                     items(menus) { menu ->
                         FilterChipLuxury(
                             text = menu,
@@ -221,8 +221,16 @@ fun Layanan(modifier: Modifier = Modifier, navController: NavController) {
                     }
                 }
             } else {
-                // Tampilkan semua layanan yang tersedia
-                val filteredServices = services.filter { it.name.contains(searchQuery, ignoreCase = true) }
+                // Logika Filter
+                val filteredServices = services.filter { service ->
+                    val matchesSearch = service.name.contains(searchQuery, ignoreCase = true)
+                    val matchesFilter = when (selectedMenu) {
+                        "Promo" -> promos.any { it.serviceId == service.id }
+                        else -> true // "Layanan Populer" dan lainnya tampilkan semua dulu
+                    }
+                    matchesSearch && matchesFilter
+                }
+
                 if (filteredServices.isEmpty()) {
                     item { Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { Text("Tidak ada layanan ditemukan", color = Color.Gray) } }
                 } else {

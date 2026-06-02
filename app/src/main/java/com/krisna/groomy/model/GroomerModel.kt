@@ -70,3 +70,10 @@ data class GroomerResponse(
     @SerializedName("userId")
     val userId: Int
 )
+
+data class RatingRequest(
+    @SerializedName("rating")
+    val rating: Int,
+    @SerializedName("message")
+    val message: String? = null
+)

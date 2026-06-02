@@ -45,6 +45,11 @@ interface ApiService {
         @Path("id") groomerId: Int
     ): Response<GroomerResponse>
 
+    @GET("groomers")
+    suspend fun getAllGroomers(
+        @Header("Authorization") token: String
+    ): Response<List<GroomerResponse>>
+
     @POST("groomers")
     suspend fun registerGroomer(
         @Header("Authorization") token: String,
@@ -134,74 +139,39 @@ interface ApiService {
         @Path("id") serviceId: Int
     ): Response<Unit>
 
-    // --- BOOKING ---
-    @GET("bookings")
-    suspend fun getAllBookings(
+    // --- ORDERS (Unified System) ---
+    @POST("orders")
+    suspend fun createOrder(
+        @Header("Authorization") token: String,
+        @Body request: CreateOrderRequest
+    ): Response<OrderResponse>
+
+    @GET("orders")
+    suspend fun getAllOrders(
         @Header("Authorization") token: String,
         @Query("groomerId") groomerId: Int? = null,
         @Query("userId") userId: Int? = null
-    ): Response<List<BookingResponse>>
-
-    @POST("bookings")
-    suspend fun createBooking(
-        @Header("Authorization") token: String,
-        @Body request: BookingRequest
-    ): Response<BookingResponse>
-
-    @PATCH("bookings/{id}/status")
-    suspend fun updateBookingStatus(
-        @Header("Authorization") token: String,
-        @Path("id") bookingId: Int,
-        @Body request: UpdateBookingStatusRequest
-    ): Response<BookingResponse>
-
-    // --- REVIEWS / RATING ---
-    @PATCH("groomers/{id}/rate")
-    suspend fun rateGroomer(
-        @Header("Authorization") token: String,
-        @Path("id") groomerId: Int,
-        @Body request: Map<String, Int>
-    ): Response<GroomerResponse>
-
-    // --- CHATS ---
-    @POST("chats")
-    suspend fun createChat(
-        @Header("Authorization") token: String,
-        @Body request: ChatRequest
-    ): Response<ChatResponse>
-
-    @GET("chats")
-    suspend fun getChats(
-        @Header("Authorization") token: String,
-        @Query("userId") userId: Int? = null,
-        @Query("groomerId") groomerId: Int? = null,
-        @Query("orderId") orderId: Int? = null
-    ): Response<List<ChatResponse>>
-
-    @GET("orders/{orderId}/chats")
-    suspend fun getOrderChats(
-        @Header("Authorization") token: String,
-        @Path("orderId") orderId: Int
-    ): Response<List<ChatResponse>>
-
-    // --- ORDERS (New from Documentation) ---
-    @GET("orders")
-    suspend fun getAllOrders(
-        @Header("Authorization") token: String
-    ): Response<List<BookingResponse>>
+    ): Response<List<OrderResponse>>
 
     @GET("orders/{id}")
     suspend fun getOrderById(
         @Header("Authorization") token: String,
         @Path("id") id: Int
-    ): Response<BookingResponse>
+    ): Response<OrderResponse>
+
+    @PATCH("orders/{id}")
+    suspend fun updateOrder(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int,
+        @Body request: CreateOrderRequest
+    ): Response<OrderResponse>
 
     @PATCH("orders/{id}/status")
     suspend fun updateOrderStatus(
         @Header("Authorization") token: String,
         @Path("id") id: Int,
-        @Body request: UpdateBookingStatusRequest
-    ): Response<BookingResponse>
+        @Body request: UpdateOrderStatusRequest
+    ): Response<OrderResponse>
 
     // --- PROMOS ---
     @POST("promos")
@@ -233,5 +203,34 @@ interface ApiService {
         @Header("Authorization") token: String,
         @Path("id") id: Int
     ): Response<Unit>
+
+    // --- REVIEWS / RATING ---
+    @PATCH("groomers/{id}/rate")
+    suspend fun rateGroomer(
+        @Header("Authorization") token: String,
+        @Path("id") groomerId: Int,
+        @Body request: RatingRequest
+    ): Response<GroomerResponse>
+
+    // --- CHATS ---
+    @POST("chats")
+    suspend fun createChat(
+        @Header("Authorization") token: String,
+        @Body request: ChatRequest
+    ): Response<ChatResponse>
+
+    @GET("chats")
+    suspend fun getChats(
+        @Header("Authorization") token: String,
+        @Query("userId") userId: Int? = null,
+        @Query("groomerId") groomerId: Int? = null,
+        @Query("orderId") orderId: Int? = null
+    ): Response<List<ChatResponse>>
+
+    @GET("orders/{orderId}/chats")
+    suspend fun getOrderChats(
+        @Header("Authorization") token: String,
+        @Path("orderId") orderId: Int
+    ): Response<List<ChatResponse>>
 
 }

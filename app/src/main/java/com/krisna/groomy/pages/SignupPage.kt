@@ -242,8 +242,14 @@ fun SignupPage(modifier: Modifier = Modifier, navController: NavController) {
                                     Toast.makeText(context, "Registration Successful, but token missing", Toast.LENGTH_SHORT).show()
                                 }
                             } else {
-                                val errorMsg = response.errorBody()?.string() ?: response.message()
-                                Toast.makeText(context, "Registration Failed: $errorMsg", Toast.LENGTH_LONG).show()
+                                // Parsing error message dari body
+                                val errorBody = response.errorBody()?.string()
+                                val errorMsg = if (errorBody?.contains("\"message\":") == true) {
+                                    errorBody.substringAfter("\"message\":\"").substringBefore("\"")
+                                } else {
+                                    response.message().ifEmpty { "Registration Failed (Error ${response.code()})" }
+                                }
+                                Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
                             }
                         } catch (e: Exception) {
                             Toast.makeText(context, "Connection Error: ${e.localizedMessage}", Toast.LENGTH_LONG).show()

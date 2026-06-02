@@ -68,8 +68,23 @@ fun Profile(modifier: Modifier = Modifier, navController: NavController) {
                         profileRes.body()?.let { profile ->
                             android.util.Log.d("DEBUG_API", "User Profile Data: role=${profile.role}, hasGroomer=${!profile.groomers.isNullOrEmpty()}")
                             
-                            // Debug Toast agar terlihat langsung di layar HP
-                            // Toast.makeText(context, "Role: ${profile.role}", Toast.LENGTH_SHORT).show()
+                            val roleFromBackend = profile.role ?: "USER"
+                            val hasGroomer = !profile.groomers.isNullOrEmpty()
+
+                            // AUTO REFRESH TOKEN: Jika di database sudah ada groomer tapi token masih role USER
+                            if (roleFromBackend.uppercase() == "USER" && hasGroomer) {
+                                android.util.Log.d("DEBUG_API", "Role mismatch detected! Attempting auto refresh-token...")
+                                val refreshRes = RetrofitClient.instance.refreshToken("Bearer $token")
+                                if (refreshRes.isSuccessful) {
+                                    val newToken = refreshRes.body()?.accessToken
+                                    if (newToken != null) {
+                                        prefManager.saveToken(newToken)
+                                        // Panggil fetchData lagi dengan token baru
+                                        fetchData()
+                                        return@launch
+                                    }
+                                }
+                            }
 
                             val rawPhoto = profile.profilePicture
                             val photoUrl = when {
@@ -84,13 +99,12 @@ fun Profile(modifier: Modifier = Modifier, navController: NavController) {
                                 email = profile.email ?: "",
                                 phone = profile.phone ?: "-",
                                 address = "",
-                                role = profile.role ?: "USER",
+                                role = roleFromBackend,
                                 isGroomerApproved = true,
                                 profilePhotoUrl = photoUrl
                             )
                             
-                            // Cek jika user punya data di tabel Groomer
-                            hasGroomerProfile = !profile.groomers.isNullOrEmpty()
+                            hasGroomerProfile = hasGroomer
                         }
                     }
 
@@ -186,7 +200,6 @@ fun Profile(modifier: Modifier = Modifier, navController: NavController) {
 
                         Spacer(modifier = Modifier.height(32.dp))
 
-                        // PAKSA TAMPIL: Jika role GROOMER ATAU sudah punya data profil groomer
                         val userRole = userProfile.role.uppercase()
                         if (userRole == "GROOMER" || userRole == "ADMIN" || hasGroomerProfile) {
                             Button(

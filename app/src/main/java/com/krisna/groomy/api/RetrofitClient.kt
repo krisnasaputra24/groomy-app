@@ -14,6 +14,14 @@ object RetrofitClient {
 
     private val client = OkHttpClient.Builder()
         .addInterceptor(logging)
+        .addInterceptor { chain ->
+            val request = chain.request().newBuilder()
+                .addHeader("Content-Type", "application/json")
+                .addHeader("Accept", "application/json")
+                .addHeader("User-Agent", "GroomyAndroidApp")
+                .build()
+            chain.proceed(request)
+        }
         .build()
 
     val instance: ApiService by lazy {

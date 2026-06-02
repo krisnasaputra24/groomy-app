@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
@@ -23,7 +24,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.krisna.groomy.api.RetrofitClient
-import com.krisna.groomy.model.BookingResponse
+import com.krisna.groomy.model.OrderResponse
+import com.krisna.groomy.model.OrderStatus
 import com.krisna.groomy.utils.PrefManager
 import kotlinx.coroutines.launch
 
@@ -34,7 +36,7 @@ fun GroomerTransactionPage(navController: NavController) {
     val prefManager = remember { PrefManager(context) }
     val scope = rememberCoroutineScope()
     
-    val transactions = remember { mutableStateListOf<BookingResponse>() }
+    val transactions = remember { mutableStateListOf<OrderResponse>() }
     var isLoading by remember { mutableStateOf(true) }
 
     fun fetchTransactions() {
@@ -47,15 +49,15 @@ fun GroomerTransactionPage(navController: NavController) {
                     val groomerId = profileRes.body()?.groomers?.firstOrNull()?.id
                     
                     if (groomerId != null) {
-                        val response = RetrofitClient.instance.getAllBookings("Bearer $token", groomerId = groomerId)
+                        val response = RetrofitClient.instance.getAllOrders("Bearer $token", groomerId = groomerId)
                         if (response.isSuccessful) {
                             transactions.clear()
-                            // Hanya ambil yang COMPLETED atau REJECTED
+                            // Ambil yang sudah selesai atau dibatalkan
                             response.body()?.let { list ->
-                                transactions.addAll(
-                                    list.filter { it.status?.name == "COMPLETED" || it.status?.name == "REJECTED" }
-                                        .sortedByDescending { it.updatedAt }
-                                )
+                                val filtered = list.filter { 
+                                    it.status == OrderStatus.COMPLETED || it.status == OrderStatus.CANCELLED
+                                }
+                                transactions.addAll(filtered.sortedByDescending { it.updatedAt })
                             }
                         }
                     }
@@ -112,7 +114,12 @@ fun GroomerTransactionPage(navController: NavController) {
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(transactions) { item ->
-                        TransactionItemCard(item)
+                        TransactionItemCard(
+                            item = item,
+                            onChatClick = {
+                                navController.navigate("chat/${item.id}/${item.groomerId}/${item.user?.name ?: "Customer"}")
+                            }
+                        )
                     }
                 }
             }
@@ -121,8 +128,9 @@ fun GroomerTransactionPage(navController: NavController) {
 }
 
 @Composable
-fun TransactionItemCard(item: BookingResponse) {
-    val isCompleted = item.status?.name == "COMPLETED"
+fun TransactionItemCard(item: OrderResponse, onChatClick: () -> Unit) {
+    val status = item.status ?: OrderStatus.PENDING
+    val isCompleted = status == OrderStatus.COMPLETED
     val statusColor = if (isCompleted) Color(0xFF10B981) else Color(0xFFEF4444)
     val statusIcon = if (isCompleted) Icons.Default.CheckCircle else Icons.Default.Cancel
 
@@ -142,12 +150,26 @@ fun TransactionItemCard(item: BookingResponse) {
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = if (isCompleted) "Selesai" else "Dibatalkan/Ditolak",
+                    text = if (isCompleted) "Selesai" else "Dibatalkan",
                     color = statusColor,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp
                 )
                 Spacer(modifier = Modifier.weight(1f))
+                
+                IconButton(
+                    onClick = { onChatClick() },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Chat,
+                        contentDescription = "Chat",
+                        tint = Color(0xFF257DEF),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = item.updatedAt.take(10),
                     fontSize = 12.sp,
