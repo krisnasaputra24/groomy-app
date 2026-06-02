@@ -71,18 +71,37 @@ fun Layanan(modifier: Modifier = Modifier, navController: NavController) {
             scope.launch {
                 try {
                     isLoading = true
-                    // 1. Fetch All Services
-                    val serviceRes = RetrofitClient.instance.getAllServices(null)
+                    
+                    // Logic penentuan parameter API berdasarkan menu yang dipilih
+                    val sortBy = if (selectedMenu == "Layanan Populer") "rating" else null
+                    val order = if (selectedMenu == "Layanan Populer") "desc" else null
+                    val apiFilter = if (selectedMenu == "Layanan Populer") "popular" else null
+
+                    // 1. Fetch Services (Sekarang menggunakan filter/sorting dari Backend)
+                    val serviceRes = RetrofitClient.instance.getAllServices(
+                        sortBy = sortBy,
+                        order = order,
+                        filter = apiFilter,
+                        search = if (searchQuery.isNotBlank()) searchQuery else null
+                    )
+                    
                     if (serviceRes.isSuccessful) {
                         services.clear()
                         serviceRes.body()?.let { services.addAll(it) }
                     }
 
-                    // 2. Fetch All Promos
+                    // 2. Fetch All Promos (Tetap diperlukan untuk filter "Promo" lokal atau badge)
                     val promoRes = RetrofitClient.instance.getAllPromos("Bearer $token")
                     if (promoRes.isSuccessful) {
                         promos.clear()
                         promoRes.body()?.let { promos.addAll(it) }
+                    }
+
+                    // 3. Fetch All Groomers (untuk mapping rating di UI)
+                    val groomerRes = RetrofitClient.instance.getAllGroomers("Bearer $token")
+                    if (groomerRes.isSuccessful) {
+                        groomers.clear()
+                        groomerRes.body()?.let { groomers.addAll(it) }
                     }
                 } catch (e: Exception) {
                     Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -93,7 +112,16 @@ fun Layanan(modifier: Modifier = Modifier, navController: NavController) {
         }
     }
 
-    LaunchedEffect(Unit) { fetchData() }
+    // Trigger fetch ulang saat menu filter atau pencarian berubah
+    LaunchedEffect(selectedMenu) { fetchData() }
+    
+    // Gunakan debounce untuk pencarian agar tidak terlalu sering menembak API
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.isNotEmpty()) {
+            kotlinx.coroutines.delay(500) // Tunggu user selesai mengetik
+        }
+        fetchData()
+    }
 
     Box(
         modifier = modifier
@@ -221,22 +249,26 @@ fun Layanan(modifier: Modifier = Modifier, navController: NavController) {
                     }
                 }
             } else {
-                // Logika Filter
-                val filteredServices = services.filter { service ->
-                    val matchesSearch = service.name.contains(searchQuery, ignoreCase = true)
-                    val matchesFilter = when (selectedMenu) {
-                        "Promo" -> promos.any { it.serviceId == service.id }
-                        else -> true // "Layanan Populer" dan lainnya tampilkan semua dulu
-                    }
-                    matchesSearch && matchesFilter
+                // Logika Filter Lokal (Hanya untuk Promo, lainnya sudah dihandle API)
+                val filteredServices = if (selectedMenu == "Promo") {
+                    services.filter { service -> promos.any { it.serviceId == service.id } }
+                } else {
+                    services
                 }
 
                 if (filteredServices.isEmpty()) {
                     item { Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { Text("Tidak ada layanan ditemukan", color = Color.Gray) } }
                 } else {
                     items(filteredServices) { service ->
+                        // Cari data groomer yang sesuai untuk mengambil rating aslinya
+                        val groomer = groomers.find { it.id == service.groomerId }
+                        val rating = groomer?.rating?.toDouble() ?: 0.0
+                        
                         Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
-                            ServiceCardDynamic(service) {
+                            ServiceCardDynamic(
+                                service = service,
+                                rating = rating
+                            ) {
                                 // Saat layanan diklik, buka detail groomernya
                                 navController.navigate("groomer_detail/${service.groomerId}")
                             }
@@ -297,7 +329,7 @@ fun Layanan(modifier: Modifier = Modifier, navController: NavController) {
 }
 
 @Composable
-fun ServiceCardDynamic(service: ServiceResponse, onClick: () -> Unit) {
+fun ServiceCardDynamic(service: ServiceResponse, rating: Double, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -354,8 +386,22 @@ fun ServiceCardDynamic(service: ServiceResponse, onClick: () -> Unit) {
                 )
             }
             
-            Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFB800), modifier = Modifier.size(16.dp))
-            Text("4.8", fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp))
+            if (rating > 0) {
+                Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFB800), modifier = Modifier.size(16.dp))
+                Text(
+                    text = rating.toString(), 
+                    fontSize = 12.sp, 
+                    fontWeight = FontWeight.Bold, 
+                    modifier = Modifier.padding(start = 4.dp)
+                )
+            } else {
+                Text(
+                    text = "New", 
+                    fontSize = 12.sp, 
+                    color = Color(0xFF10B981), 
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
     }
 }

@@ -57,9 +57,11 @@ fun GroomerDetailPage(
     var groomerInfo by remember { mutableStateOf<GroomerResponse?>(null) }
     val services = remember { mutableStateListOf<ServiceResponse>() }
     val pets = remember { mutableStateListOf<PetResponse>() }
+    val promos = remember { mutableStateListOf<com.krisna.groomy.model.PromoResponse>() }
     
     var selectedService by remember { mutableStateOf<ServiceResponse?>(null) }
     var selectedPet by remember { mutableStateOf<PetResponse?>(null) }
+    var selectedPromo by remember { mutableStateOf<com.krisna.groomy.model.PromoResponse?>(null) }
     var selectedDate by remember { mutableStateOf("") }
     var selectedTime by remember { mutableStateOf("") }
     
@@ -91,6 +93,12 @@ fun GroomerDetailPage(
                     if (petsRes.isSuccessful) {
                         pets.clear()
                         petsRes.body()?.let { pets.addAll(it) }
+                    }
+                    
+                    val promosRes = RetrofitClient.instance.getAllPromos("Bearer $token", groomerId = groomerId)
+                    if (promosRes.isSuccessful) {
+                        promos.clear()
+                        promosRes.body()?.let { promos.addAll(it) }
                     }
                     
                 } catch (e: Exception) {
@@ -214,12 +222,69 @@ fun GroomerDetailPage(
                     ServiceDetailCardDynamic(
                         service = service,
                         isSelected = selectedService == service,
-                        onSelect = { selectedService = service }
+                        onSelect = { 
+                            selectedService = service 
+                            // Reset selected promo if not applicable to new service
+                            if (selectedPromo?.serviceId != service.id) {
+                                selectedPromo = null
+                            }
+                        }
                     )
+                }
+
+                if (selectedService != null) {
+                    val applicablePromos = promos.filter { it.serviceId == selectedService!!.id }
+                    if (applicablePromos.isNotEmpty()) {
+                        item {
+                            Text("Promo Tersedia", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
+                            Spacer(modifier = Modifier.height(12.dp))
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                items(applicablePromos) { promo ->
+                                    PromoSelectionCard(
+                                        promo = promo,
+                                        isSelected = selectedPromo == promo,
+                                        onSelect = { 
+                                            selectedPromo = if (selectedPromo == promo) null else promo 
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
                 
                 item {
                     Spacer(modifier = Modifier.height(24.dp))
+                    
+                    // Ringkasan Pembayaran
+                    if (selectedService != null) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFF1F5F9))
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("Harga Layanan", color = Color(0xFF64748B))
+                                    Text("Rp ${selectedService!!.price.toInt()}", fontWeight = FontWeight.Bold)
+                                }
+                                if (selectedPromo != null) {
+                                    val discountAmount = (selectedService!!.price * selectedPromo!!.discount / 100).toInt()
+                                    Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("Promo (${selectedPromo!!.code})", color = Color(0xFF10B981))
+                                        Text("- Rp $discountAmount", color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
+                                    }
+                                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color.White)
+                                    val totalPrice = (selectedService!!.price - discountAmount).toInt()
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("Total Pembayaran", fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
+                                        Text("Rp $totalPrice", fontWeight = FontWeight.ExtraBold, color = Color(0xFF257DEF), fontSize = 18.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     Button(
                         onClick = { 
                             val token = prefManager.getToken()
@@ -232,7 +297,8 @@ fun GroomerDetailPage(
                                             time = selectedTime,
                                             groomerId = groomerId,
                                             serviceId = selectedService!!.id,
-                                            petId = selectedPet?.id
+                                            petId = selectedPet?.id,
+                                            promoId = selectedPromo?.id
                                         )
                                         val response = RetrofitClient.instance.createOrder("Bearer $token", request)
                                         if (response.isSuccessful) {
@@ -326,6 +392,31 @@ fun PetSelectionCard(pet: PetResponse, isSelected: Boolean, onSelect: () -> Unit
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(text = pet.name, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B), maxLines = 1)
+        }
+    }
+}
+
+@Composable
+fun PromoSelectionCard(
+    promo: com.krisna.groomy.model.PromoResponse,
+    isSelected: Boolean,
+    onSelect: () -> Unit
+) {
+    Card(
+        modifier = Modifier.width(160.dp).clickable { onSelect() },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = if (isSelected) Color(0xFFDCFCE7) else Color.White),
+        border = BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) Color(0xFF10B981) else Color(0xFFF1F5F9))
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = if (isSelected) Color(0xFF10B981) else Color.LightGray, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = promo.code, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF1E293B))
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(text = "Diskon ${promo.discount}%", color = Color(0xFF10B981), fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+            Text(text = "Hingga ${promo.expiryDate.take(10)}", fontSize = 10.sp, color = Color(0xFF64748B))
         }
     }
 }

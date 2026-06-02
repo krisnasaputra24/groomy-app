@@ -107,7 +107,11 @@ interface ApiService {
     // --- SERVICES ---
     @GET("services")
     suspend fun getAllServices(
-        @Query("groomerId") groomerId: Int? = null
+        @Query("groomerId") groomerId: Int? = null,
+        @Query("sort_by") sortBy: String? = null,
+        @Query("order") order: String? = null,
+        @Query("filter") filter: String? = null,
+        @Query("search") search: String? = null
     ): Response<List<ServiceResponse>>
 
     @Multipart
@@ -182,7 +186,9 @@ interface ApiService {
 
     @GET("promos")
     suspend fun getAllPromos(
-        @Header("Authorization") token: String
+        @Header("Authorization") token: String,
+        @Query("groomerId") groomerId: Int? = null,
+        @Query("serviceId") serviceId: Int? = null
     ): Response<List<PromoResponse>>
 
     @GET("promos/{id}")

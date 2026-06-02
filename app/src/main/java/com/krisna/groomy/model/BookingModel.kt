@@ -22,7 +22,8 @@ data class CreateOrderRequest(
     val time: String,       // "10:00"
     val groomerId: Int,
     val serviceId: Int,
-    val petId: Int?         // Optional (untuk grooming)
+    val petId: Int?,         // Optional (untuk grooming)
+    val promoId: Int? = null
 )
 
 data class UpdateOrderStatusRequest(

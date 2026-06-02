@@ -15,12 +15,17 @@ object RetrofitClient {
     private val client = OkHttpClient.Builder()
         .addInterceptor(logging)
         .addInterceptor { chain ->
-            val request = chain.request().newBuilder()
-                .addHeader("Content-Type", "application/json")
+            val original = chain.request()
+            val requestBuilder = original.newBuilder()
                 .addHeader("Accept", "application/json")
                 .addHeader("User-Agent", "GroomyAndroidApp")
-                .build()
-            chain.proceed(request)
+            
+            // Hanya tambah Content-Type json jika bukan Multipart/Form-data
+            if (original.body?.contentType() == null) {
+                requestBuilder.addHeader("Content-Type", "application/json")
+            }
+            
+            chain.proceed(requestBuilder.build())
         }
         .build()
 

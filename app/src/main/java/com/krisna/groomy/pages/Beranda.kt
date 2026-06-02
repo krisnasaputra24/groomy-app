@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -75,6 +76,8 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
     val allServices = remember { mutableStateListOf<ServiceResponse>() }
     var isLoadingServices by remember { mutableStateOf(true) }
 
+    val groomers = remember { mutableStateListOf<com.krisna.groomy.model.GroomerResponse>() }
+
     val activePromos = remember { mutableStateListOf<PromoResponse>() }
     var isLoadingPromos by remember { mutableStateOf(true) }
     
@@ -107,13 +110,27 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
     }
 
     fun fetchAllServices() {
+        val token = prefManager.getToken()
         scope.launch {
             try {
                 isLoadingServices = true
-                val response = RetrofitClient.instance.getAllServices(null)
+                // Mengambil layanan terbaru dengan sorting dari backend
+                val response = RetrofitClient.instance.getAllServices(
+                    sortBy = "createdAt",
+                    order = "desc"
+                )
                 if (response.isSuccessful) {
                     allServices.clear()
                     response.body()?.let { allServices.addAll(it) }
+                }
+
+                // Ambil data groomer untuk mendapatkan rating
+                if (token != null) {
+                    val groomerRes = RetrofitClient.instance.getAllGroomers("Bearer $token")
+                    if (groomerRes.isSuccessful) {
+                        groomers.clear()
+                        groomerRes.body()?.let { groomers.addAll(it) }
+                    }
                 }
             } catch (e: Exception) { }
             finally {
@@ -149,10 +166,13 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
                     isLoadingActiveOrder = true
                     val response = RetrofitClient.instance.getAllOrders("Bearer $savedToken")
                     if (response.isSuccessful) {
-                        // Ambil order terbaru yang statusnya bukan COMPLETED atau CANCELLED
-                        activeOrder = response.body()?.firstOrNull { 
+                        // Ambil semua order yang aktif (bukan COMPLETED/CANCELLED) 
+                        // dan urutkan berdasarkan tanggal terdekat
+                        val activeOrdersList = response.body()?.filter { 
                             it.status != OrderStatus.COMPLETED && it.status != OrderStatus.CANCELLED
-                        }
+                        }?.sortedBy { it.date + it.time }
+                        
+                        activeOrder = activeOrdersList?.firstOrNull()
                     }
                 } catch (e: Exception) { }
                 finally {
@@ -326,24 +346,95 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
             item {
                 RecommendationCardLight(
                     title = "Layanan Terbaru",
-                    subtitle = "Dari groomer profesional",
+                    subtitle = "Baru saja ditambahkan",
                     icon = Icons.Default.AutoAwesome
                 ) {
                     if (isLoadingServices) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                        }
                     } else if (allServices.isEmpty()) {
-                        Text("Belum ada layanan tersedia", color = Color.Gray)
+                        Text("Belum ada layanan tersedia", color = Color.Gray, fontSize = 14.sp)
                     } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             allServices.take(3).forEach { service ->
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF257DEF), modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "${service.name} - Rp ${service.price.toInt()}",
-                                        color = Color(0xFF475569),
-                                        fontSize = 15.sp
-                                    )
+                                // Temukan rating groomer untuk layanan ini
+                                val groomer = groomers.find { it.id == service.groomerId }
+                                val rating = groomer?.rating ?: 0
+                                
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { navController.navigate("groomer_detail/${service.groomerId}") },
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Thumbnail Mini
+                                    Box(
+                                        modifier = Modifier
+                                            .size(45.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color(0xFFF1F5F9)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        val photoUrl = if (service.photo.isNullOrBlank()) null 
+                                                      else if (service.photo.startsWith("http")) service.photo 
+                                                      else "https://groomy-sigma.vercel.app/${service.photo}"
+                                        
+                                        if (photoUrl != null) {
+                                            AsyncImage(
+                                                model = photoUrl,
+                                                contentDescription = null,
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        } else {
+                                            Icon(Icons.Default.Pets, contentDescription = null, tint = Color(0xFF257DEF), modifier = Modifier.size(20.dp))
+                                        }
+                                    }
+                                    
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = service.name,
+                                            color = Color(0xFF1E293B),
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1
+                                        )
+                                        Text(
+                                            text = "Rp ${service.price.toInt()}",
+                                            color = Color(0xFF257DEF),
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                    
+                                    if (rating > 0) {
+                                        Icon(
+                                            Icons.Default.Star, 
+                                            contentDescription = null, 
+                                            tint = Color(0xFFFFB800), 
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Text(
+                                            text = rating.toString(),
+                                            modifier = Modifier.padding(start = 4.dp),
+                                            color = Color(0xFF1E293B),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    } else {
+                                        Text(
+                                            text = "New",
+                                            color = Color(0xFF10B981),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                                if (service != allServices.take(3).last()) {
+                                    HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 0.5.dp)
                                 }
                             }
                         }
@@ -357,11 +448,63 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
                     subtitle = "Jangan sampai terlewat",
                     icon = Icons.Default.CalendarMonth
                 ) {
-                    Text(
-                        "Belum ada jadwal booking aktif",
-                        color = Color(0xFF64748B),
-                        fontSize = 15.sp
-                    )
+                    if (isLoadingActiveOrder) {
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                        }
+                    } else if (activeOrder != null) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { 
+                                    // Bisa diarahkan ke halaman detail order jika ada
+                                }
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Schedule,
+                                    contentDescription = null,
+                                    tint = Color(0xFF257DEF),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "${activeOrder?.date?.take(10)} • ${activeOrder?.time}",
+                                    color = Color(0xFF1E293B),
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            when(activeOrder?.status) {
+                                                OrderStatus.PENDING -> Color(0xFFF59E0B)
+                                                OrderStatus.CONFIRMED, OrderStatus.IN_PROGRESS -> Color(0xFF257DEF)
+                                                else -> Color(0xFF64748B)
+                                            }
+                                        )
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "${activeOrder?.service?.name} - ${activeOrder?.groomer?.name}",
+                                    color = Color(0xFF64748B),
+                                    fontSize = 14.sp,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    } else {
+                        Text(
+                            "Belum ada jadwal booking aktif",
+                            color = Color(0xFF64748B),
+                            fontSize = 15.sp
+                        )
+                    }
                 }
             }
 
