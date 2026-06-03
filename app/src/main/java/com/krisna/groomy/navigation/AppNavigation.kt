@@ -19,6 +19,13 @@ import com.krisna.groomy.pages.LoginPage
 import com.krisna.groomy.pages.PaymentPage
 import com.krisna.groomy.pages.RegisterGroomerPage
 import com.krisna.groomy.pages.SignupPage
+import com.krisna.groomy.ui.diagnosis.DiagnosisScreen
+import com.krisna.groomy.ui.diagnosis.DiagnosisViewModel
+import com.krisna.groomy.data.ml.KeluhanClassifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.krisna.groomy.screens.MainScreen
 import com.krisna.groomy.screens.SplashScreen
 
@@ -44,6 +51,30 @@ fun AppNavigation(modifier: Modifier = Modifier) {
 
         composable("home") {
             MainScreen(navController = navController)
+        }
+
+        composable("diagnosis") {
+            val context = LocalContext.current
+            
+            // Inisialisasi yang lebih aman dengan lifecycle
+            val classifier = remember { KeluhanClassifier(context) }
+            
+            // Cleanup saat user keluar dari screen ini
+            DisposableEffect(Unit) {
+                onDispose {
+                    classifier.close()
+                }
+            }
+            
+            val viewModel: DiagnosisViewModel = viewModel(
+                factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+                    @Suppress("UNCHECKED_CAST")
+                    override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                        return DiagnosisViewModel(classifier) as T
+                    }
+                }
+            )
+            DiagnosisScreen(viewModel = viewModel, navController = navController)
         }
 
         composable("register_groomer") {

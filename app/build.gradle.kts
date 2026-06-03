@@ -5,11 +5,7 @@ plugins {
 
 android {
     namespace = "com.krisna.groomy"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.krisna.groomy"
@@ -30,12 +26,33 @@ android {
             )
         }
     }
+    
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
     buildFeatures {
         compose = true
+        mlModelBinding = true
+    }
+
+    androidResources {
+        noCompress += "tflite"
+    }
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+        resources {
+            pickFirsts += "lib/x86/libtensorflowlite_jni.so"
+            pickFirsts += "lib/x86_64/libtensorflowlite_jni.so"
+            pickFirsts += "lib/armeabi-v7a/libtensorflowlite_jni.so"
+            pickFirsts += "lib/arm64-v8a/libtensorflowlite_jni.so"
+            pickFirsts += "lib/x86/libtensorflowlite_flex_jni.so"
+            pickFirsts += "lib/x86_64/libtensorflowlite_flex_jni.so"
+            pickFirsts += "lib/armeabi-v7a/libtensorflowlite_flex_jni.so"
+            pickFirsts += "lib/arm64-v8a/libtensorflowlite_flex_jni.so"
+        }
     }
 }
 
@@ -48,6 +65,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.tensorflow.lite.metadata)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
@@ -69,4 +87,9 @@ dependencies {
     implementation("androidx.compose.foundation:foundation:1.6.0")
     implementation(libs.coil.compose)
     implementation(libs.cloudinary.android)
+    
+    implementation("org.tensorflow:tensorflow-lite:2.16.1")
+    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1") // TAMBAHKAN INI
+    implementation("org.tensorflow:tensorflow-lite-support-api:0.4.4")
+    implementation(libs.tensorflow.lite.metadata)
 }

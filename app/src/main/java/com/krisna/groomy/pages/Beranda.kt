@@ -525,7 +525,7 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    Icons.Default.Info,
+                                    Icons.Default.AutoAwesome,
                                     contentDescription = null,
                                     tint = Color(0xFF257DEF),
                                     modifier = Modifier.size(18.dp)
@@ -533,7 +533,7 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
                             }
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
-                                "Care Insight",
+                                "Groomy AI Assistant",
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF1E293B),
                                 fontSize = 16.sp
@@ -541,11 +541,20 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
                         }
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            "Menyikat gigi anjing secara teratur dapat mencegah penumpukan karang gigi dan penyakit gusi.",
+                            "Ada masalah dengan hewan peliharaan Anda? Gunakan asisten AI kami untuk mendiagnosis keluhan secara instan.",
                             color = Color(0xFF64748B),
                             fontSize = 14.sp,
                             lineHeight = 20.sp
                         )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = { navController.navigate("diagnosis") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF257DEF))
+                        ) {
+                            Text("Konsultasi AI Sekarang", fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
