@@ -18,7 +18,8 @@ class KeluhanClassifier(context: Context) {
 
     data class ClassificationResult(
         val label: String,
-        val confidence: Float
+        val confidence: Float,
+        val rawScore: Float = 0f
     )
 
     init {
@@ -72,24 +73,54 @@ class KeluhanClassifier(context: Context) {
                 inputIds[i] = vocab[words[i]] ?: 0
             }
 
-            // Input: [1, 50], Output: [1, 30]
+            // Input: [1, 50], Output: Dinamis sesuai model
+            val outputShape = currentInterpreter.getOutputTensor(0).shape() // contoh: [1, 30]
+            val outputSize = outputShape[1]
             val inputBuffer = arrayOf(inputIds)
-            val outputBuffer = Array(1) { FloatArray(30) }
+            val outputBuffer = Array(1) { FloatArray(outputSize) }
 
             currentInterpreter.run(inputBuffer, outputBuffer)
 
-            val results = outputBuffer[0]
-            val maxIdx = results.indices.maxByOrNull { results[it] } ?: 0
-            val maxScore = results[maxIdx]
+            val rawResults = outputBuffer[0]
+            
+            // Cari index dengan nilai MENTAH tertinggi terlebih dahulu
+            val maxIdx = rawResults.indices.maxByOrNull { rawResults[it] } ?: 0
+            
+            // Baru hitung softmax untuk mendapatkan persentase yang manusiawi
+            val probabilities = softmax(rawResults)
+            val maxScore = probabilities[maxIdx]
+
+            Log.d("KeluhanClassifier", "MaxIdx: $maxIdx, RawScore: ${rawResults[maxIdx]}, Prob: $maxScore, Label: ${labels.getOrNull(maxIdx)}")
 
             ClassificationResult(
                 label = labels.getOrElse(maxIdx) { "unknown" },
-                confidence = maxScore
+                confidence = maxScore,
+                rawScore = rawResults[maxIdx]
             )
         } catch (e: Exception) {
             Log.e("KeluhanClassifier", "Inference Failed: ${e.message}")
             ClassificationResult("Error: ${e.localizedMessage}", 0f)
         }
+    }
+
+    private fun softmax(logits: FloatArray): FloatArray {
+        var maxLogit = Float.NEGATIVE_INFINITY
+        for (logit in logits) if (logit > maxLogit) maxLogit = logit
+        
+        var sum = 0f
+        val probabilities = FloatArray(logits.size)
+        for (i in logits.indices) {
+            probabilities[i] = kotlin.math.exp(logits[i] - maxLogit)
+            sum += probabilities[i]
+        }
+        
+        if (sum != 0f) {
+            for (i in probabilities.indices) {
+                probabilities[i] /= sum
+            }
+        }
+        
+        return probabilities
     }
 
     fun close() {

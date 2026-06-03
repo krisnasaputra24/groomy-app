@@ -1,5 +1,6 @@
 package com.krisna.groomy.ui.diagnosis
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.krisna.groomy.data.ml.KeluhanClassifier
@@ -28,6 +29,7 @@ class DiagnosisViewModel(
             _uiState.update { it.copy(isLoading = true, isResultVisible = false) }
             
             val result = classifier.classify(input)
+            Log.d("DiagnosisViewModel", "Classifier Result: Label=${result.label}, Confidence=${result.confidence}, Raw=${result.rawScore}")
             
             if (result.label.startsWith("Error")) {
                 _uiState.update { 
