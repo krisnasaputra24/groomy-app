@@ -8,11 +8,13 @@ data class PromoRequest(
     @SerializedName("description")
     val description: String,
     @SerializedName("discount")
-    val discount: Int,
+    val discount: Double,
     @SerializedName("expiryDate")
     val expiryDate: String,
     @SerializedName("serviceId")
-    val serviceId: Int
+    val serviceId: Int,
+    @SerializedName("groomerId")
+    val groomerId: Int
 )
 
 data class PromoResponse(

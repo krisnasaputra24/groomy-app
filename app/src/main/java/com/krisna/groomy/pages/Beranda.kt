@@ -16,6 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
@@ -109,7 +110,7 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
         }
     }
 
-    fun fetchAllServices() {
+    fun fetchAllServices(query: String? = null) {
         val token = prefManager.getToken()
         scope.launch {
             try {
@@ -117,7 +118,8 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
                 // Mengambil layanan terbaru dengan sorting dari backend
                 val response = RetrofitClient.instance.getAllServices(
                     sortBy = "createdAt",
-                    order = "desc"
+                    order = "desc",
+                    search = query
                 )
                 if (response.isSuccessful) {
                     allServices.clear()
@@ -246,10 +248,12 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Box(
                             modifier = Modifier
                                 .size(54.dp)
@@ -290,14 +294,6 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
                             )
                         }
                     }
-                    IconButton(
-                        onClick = { },
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color.White)
-                    ) {
-                        Icon(Icons.Default.Notifications, contentDescription = null, tint = Color(0xFF257DEF))
-                    }
                 }
             }
 
@@ -308,6 +304,16 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text("Cari layanan atau produk...", color = Color(0xFF94A3B8)) },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF257DEF)) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { 
+                                searchQuery = ""
+                                fetchAllServices() 
+                            }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear", tint = Color.Gray)
+                            }
+                        }
+                    },
                     shape = RoundedCornerShape(16.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = Color.White,
@@ -318,6 +324,10 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(
                         onSearch = {
+                            if (searchQuery.isNotBlank()) {
+                                val encodedQuery = Uri.encode(searchQuery)
+                                navController.navigate("search_services/$encodedQuery")
+                            }
                             focusManager.clearFocus()
                             keyboardController?.hide()
                         }
@@ -326,7 +336,15 @@ fun Beranda(modifier: Modifier = Modifier, navController: NavController) {
             }
 
             item {
-                BannerView(promos = promoBanners)
+                BannerView(
+                    promos = promoBanners,
+                    onPromoClick = { promo ->
+                        val groomerId = promo.service?.groomerId
+                        if (groomerId != null) {
+                            navController.navigate("groomer_detail/$groomerId")
+                        }
+                    }
+                )
             }
 
             if (activeOrder != null) {

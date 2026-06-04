@@ -3,11 +3,14 @@
 package com.krisna.groomy.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,7 +30,8 @@ import androidx.compose.foundation.interaction.collectIsDraggedAsState
 @Composable
 fun BannerView(
     modifier: Modifier = Modifier,
-    promos: List<PromoResponse> = emptyList()
+    promos: List<PromoResponse> = emptyList(),
+    onPromoClick: (PromoResponse) -> Unit = {}
 ) {
     val pageCount = promos.size
     
@@ -63,7 +67,9 @@ fun BannerView(
             Card(
                 shape = RoundedCornerShape(24.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable { onPromoClick(promo) }
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     val servicePhoto = promo.service?.photo
@@ -119,6 +125,26 @@ fun BannerView(
                             .align(Alignment.BottomStart)
                             .padding(20.dp)
                     ) {
+                        // Groomer Name (New)
+                        val groomerName = promo.service?.groomer?.name
+                        if (!groomerName.isNullOrBlank()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Storefront,
+                                    contentDescription = null,
+                                    tint = Color(0xFFFACC15),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = groomerName,
+                                    color = Color(0xFFFACC15),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+
                         Text(
                             text = promo.service?.name ?: "Special Offer",
                             color = Color.White,

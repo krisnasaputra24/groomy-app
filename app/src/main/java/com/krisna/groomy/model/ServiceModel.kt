@@ -71,5 +71,8 @@ data class ServiceResponse(
     val createdAt: String?,
     
     @SerializedName("updatedAt")
-    val updatedAt: String?
+    val updatedAt: String?,
+    
+    @SerializedName("groomer")
+    val groomer: GroomerResponse? = null
 )

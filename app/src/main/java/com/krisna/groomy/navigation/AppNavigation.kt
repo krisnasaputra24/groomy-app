@@ -18,6 +18,7 @@ import com.krisna.groomy.pages.GroomerTransactionPage
 import com.krisna.groomy.pages.LoginPage
 import com.krisna.groomy.pages.PaymentPage
 import com.krisna.groomy.pages.RegisterGroomerPage
+import com.krisna.groomy.pages.SearchServicesPage
 import com.krisna.groomy.pages.SignupPage
 import com.krisna.groomy.ui.diagnosis.DiagnosisScreen
 import com.krisna.groomy.ui.diagnosis.DiagnosisViewModel
@@ -51,6 +52,11 @@ fun AppNavigation(modifier: Modifier = Modifier) {
 
         composable("home") {
             MainScreen(navController = navController)
+        }
+
+        composable("search_services/{query}") { backStackEntry ->
+            val query = backStackEntry.arguments?.getString("query") ?: ""
+            SearchServicesPage(navController = navController, initialQuery = query)
         }
 
         composable("diagnosis") {

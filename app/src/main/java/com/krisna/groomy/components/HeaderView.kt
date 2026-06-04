@@ -77,13 +77,5 @@ fun Headerview(modifier: Modifier = Modifier) {
             }
         }
 
-        // Icon Notif
-        IconButton(onClick = {}) {
-            Icon(
-                imageVector = Icons.Default.Notifications,
-                contentDescription = "Notification",
-                tint = Color(0xFF257DEF)
-            )
-        }
     }
 }

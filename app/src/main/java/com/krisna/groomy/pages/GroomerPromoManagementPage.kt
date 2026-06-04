@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -19,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -39,6 +41,7 @@ fun GroomerPromoManagementPage(navController: NavController) {
     val promos = remember { mutableStateListOf<PromoResponse>() }
     val services = remember { mutableStateListOf<ServiceResponse>() }
     var isLoading by remember { mutableStateOf(true) }
+    var activeGroomerId by remember { mutableIntStateOf(0) }
     
     var showAddDialog by remember { mutableStateOf(false) }
     var editingPromo by remember { mutableStateOf<PromoResponse?>(null) }
@@ -49,22 +52,38 @@ fun GroomerPromoManagementPage(navController: NavController) {
             scope.launch {
                 try {
                     isLoading = true
-                    // Fetch Promos
-                    val promoRes = RetrofitClient.instance.getAllPromos("Bearer $token")
-                    if (promoRes.isSuccessful) {
-                        promos.clear()
-                        promoRes.body()?.let { promos.addAll(it) }
-                    }
                     
-                    // Fetch Services for dropdown
+                    // 1. Dapatkan Profile untuk mengambil Groomer ID aktif
                     val profileRes = RetrofitClient.instance.getProfile("Bearer $token")
-                    val groomerId = profileRes.body()?.groomers?.firstOrNull()?.id
-                    if (groomerId != null) {
-                        val serviceRes = RetrofitClient.instance.getAllServices(groomerId)
-                        if (serviceRes.isSuccessful) {
+                    val gId = profileRes.body()?.groomers?.firstOrNull()?.id
+                    activeGroomerId = gId ?: 0
+                    
+                    if (gId != null) {
+                        // 2. Ambil Daftar Layanan milik groomer ini terlebih dahulu
+                        val serviceRes = RetrofitClient.instance.getAllServices(gId)
+                        val myServiceIds = if (serviceRes.isSuccessful) {
                             services.clear()
-                            serviceRes.body()?.let { services.addAll(it) }
+                            val sList = serviceRes.body() ?: emptyList()
+                            services.addAll(sList)
+                            sList.map { it.id }.toSet()
+                        } else {
+                            emptySet()
                         }
+                        
+                        // 3. Ambil Semua Promo dengan filter groomerId
+                        val promoRes = RetrofitClient.instance.getAllPromos("Bearer $token", groomerId = gId)
+                        if (promoRes.isSuccessful) {
+                            promos.clear()
+                            val allPromos = promoRes.body() ?: emptyList()
+                            
+                            // FILTER CLIENT-SIDE: Pastikan promo benar-benar terikat dengan layanan milik groomer ini
+                            val filtered = allPromos.filter { promo ->
+                                myServiceIds.contains(promo.serviceId) || promo.service?.groomerId == gId
+                            }
+                            promos.addAll(filtered)
+                        }
+                    } else {
+                        Toast.makeText(context, "Profil Groomer tidak ditemukan", Toast.LENGTH_SHORT).show()
                     }
                 } catch (e: Exception) {
                     Toast.makeText(context, "Gagal memuat data", Toast.LENGTH_SHORT).show()
@@ -147,6 +166,7 @@ fun GroomerPromoManagementPage(navController: NavController) {
             PromoDialog(
                 promo = editingPromo,
                 services = services,
+                groomerId = activeGroomerId,
                 onDismiss = { 
                     showAddDialog = false
                     editingPromo = null 
@@ -223,6 +243,7 @@ fun PromoItemCard(promo: PromoResponse, onEdit: () -> Unit, onDelete: () -> Unit
 fun PromoDialog(
     promo: PromoResponse?,
     services: List<ServiceResponse>,
+    groomerId: Int,
     onDismiss: () -> Unit,
     onSave: (PromoRequest) -> Unit
 ) {
@@ -241,7 +262,7 @@ fun PromoDialog(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(value = code, onValueChange = { code = it }, label = { Text("Kode Promo") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Deskripsi") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = discount, onValueChange = { discount = it }, label = { Text("Diskon (%)") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = discount, onValueChange = { discount = it }, label = { Text("Diskon (%)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                 OutlinedTextField(value = expiryDate, onValueChange = { expiryDate = it }, label = { Text("Tanggal Exp (YYYY-MM-DD)") }, modifier = Modifier.fillMaxWidth())
                 
                 ExposedDropdownMenuBox(
@@ -276,9 +297,12 @@ fun PromoDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val discountInt = discount.toIntOrNull() ?: 0
-                    onSave(PromoRequest(code, description, discountInt, "${expiryDate}T00:00:00.000Z", selectedServiceId))
+                    val discountDouble = discount.toDoubleOrNull() ?: 0.0
+                    // Backend validator: @IsDateString() - Gunakan ISO 8601 standar
+                    val isoExpiryDate = "${expiryDate}T23:59:59.000Z"
+                    onSave(PromoRequest(code, description, discountDouble, isoExpiryDate, selectedServiceId, groomerId))
                 },
+                enabled = code.isNotBlank() && discount.isNotBlank() && selectedServiceId != 0,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF257DEF))
             ) {
                 Text("Simpan")
