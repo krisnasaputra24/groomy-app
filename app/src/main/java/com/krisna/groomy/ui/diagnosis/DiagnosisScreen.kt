@@ -24,7 +24,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
+import com.krisna.groomy.ui.theme.AppColors
+import com.krisna.groomy.ui.theme.AppIcons
+import com.krisna.groomy.ui.theme.AppShapes
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -33,15 +35,10 @@ fun DiagnosisScreen(viewModel: DiagnosisViewModel, navController: NavController)
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
 
-    // Colors
-    val primaryBlue = Color(0xFF257DEF)
-    val lightBlue = Color(0xFFE0E7FF)
-    val backgroundGray = Color(0xFFF8FAFC)
-
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(backgroundGray)
+            .background(AppColors.Background)
     ) {
         // Top Background Gradient Header
         Box(
@@ -50,7 +47,7 @@ fun DiagnosisScreen(viewModel: DiagnosisViewModel, navController: NavController)
                 .height(200.dp)
                 .background(
                     brush = Brush.verticalGradient(
-                        colors = listOf(primaryBlue, primaryBlue.copy(alpha = 0.8f))
+                        colors = listOf(AppColors.Primary, AppColors.Primary.copy(alpha = 0.8f))
                     )
                 )
         )
@@ -69,7 +66,7 @@ fun DiagnosisScreen(viewModel: DiagnosisViewModel, navController: NavController)
                     navigationIcon = {
                         IconButton(onClick = { navController.popBackStack() }) {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                imageVector = AppIcons.ArrowBack,
                                 contentDescription = "Back",
                                 tint = Color.White
                             )
@@ -94,8 +91,8 @@ fun DiagnosisScreen(viewModel: DiagnosisViewModel, navController: NavController)
                 // Welcome Section
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    shape = AppShapes.Large,
+                    colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Column(
@@ -105,13 +102,13 @@ fun DiagnosisScreen(viewModel: DiagnosisViewModel, navController: NavController)
                         Surface(
                             modifier = Modifier.size(72.dp),
                             shape = CircleShape,
-                            color = lightBlue
+                            color = AppColors.Primary.copy(alpha = 0.1f)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.SmartToy,
                                 contentDescription = null,
                                 modifier = Modifier.padding(16.dp),
-                                tint = primaryBlue
+                                tint = AppColors.Primary
                             )
                         }
 
@@ -121,13 +118,13 @@ fun DiagnosisScreen(viewModel: DiagnosisViewModel, navController: NavController)
                             "Butuh Bantuan Diagnosis?",
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1E293B)
+                            color = AppColors.TextPrimary
                         )
 
                         Text(
                             "Jelaskan gejala yang dialami anabul Anda, dan biarkan AI kami memberikan saran awal.",
                             fontSize = 14.sp,
-                            color = Color.Gray,
+                            color = AppColors.TextSecondary,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(top = 8.dp)
                         )
@@ -141,11 +138,11 @@ fun DiagnosisScreen(viewModel: DiagnosisViewModel, navController: NavController)
                             modifier = Modifier.fillMaxWidth(),
                             minLines = 4,
                             maxLines = 6,
-                            shape = RoundedCornerShape(16.dp),
+                            shape = AppShapes.Medium,
                             enabled = !uiState.isLoading,
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = primaryBlue,
-                                unfocusedBorderColor = Color(0xFFCBD5E1)
+                                focusedBorderColor = AppColors.Primary,
+                                unfocusedBorderColor = AppColors.Border
                             )
                         )
 
@@ -156,9 +153,9 @@ fun DiagnosisScreen(viewModel: DiagnosisViewModel, navController: NavController)
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(56.dp),
-                            shape = RoundedCornerShape(16.dp),
+                            shape = AppShapes.Medium,
                             enabled = uiState.textInput.isNotBlank() && !uiState.isLoading,
-                            colors = ButtonDefaults.buttonColors(containerColor = primaryBlue)
+                            colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary)
                         ) {
                             if (uiState.isLoading) {
                                 CircularProgressIndicator(
@@ -167,7 +164,7 @@ fun DiagnosisScreen(viewModel: DiagnosisViewModel, navController: NavController)
                                     strokeWidth = 3.dp
                                 )
                             } else {
-                                Icon(Icons.Default.AutoAwesome, contentDescription = null)
+                                Icon(AppIcons.Diagnosis, contentDescription = null)
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Text(
                                     "Kirim Keluhan",
@@ -201,12 +198,10 @@ fun DiagnosisScreen(viewModel: DiagnosisViewModel, navController: NavController)
 
 @Composable
 fun ResultCard(prediction: String, recommendation: String) {
-    val warningColor = Color(0xFFF59E0B)
-
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = AppShapes.Large,
+        colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
@@ -214,7 +209,7 @@ fun ResultCard(prediction: String, recommendation: String) {
                 Icon(
                     imageVector = Icons.Default.MedicalInformation,
                     contentDescription = null,
-                    tint = Color(0xFF257DEF),
+                    tint = AppColors.Primary,
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(12.dp))
@@ -222,24 +217,24 @@ fun ResultCard(prediction: String, recommendation: String) {
                     "Hasil Analisis",
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 18.sp,
-                    color = Color(0xFF1E293B)
+                    color = AppColors.TextPrimary
                 )
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = Color(0xFFF1F5F9))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = AppColors.Background)
 
             InfoRow(
                 label = "Kemungkinan Masalah",
                 value = prediction,
                 icon = Icons.Default.Troubleshoot,
-                valueColor = Color(0xFF257DEF)
+                valueColor = AppColors.Primary
             )
 
             Spacer(modifier = Modifier.height(20.dp))
 
             Surface(
-                color = Color(0xFFF8FAFC),
-                shape = RoundedCornerShape(16.dp),
+                color = AppColors.Background,
+                shape = AppShapes.Medium,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -247,13 +242,13 @@ fun ResultCard(prediction: String, recommendation: String) {
                         Icon(
                             imageVector = Icons.Default.TipsAndUpdates,
                             contentDescription = null,
-                            tint = warningColor,
+                            tint = AppColors.Warning,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             "Rekomendasi Tindakan:",
-                            color = Color(0xFF475569),
+                            color = AppColors.TextSecondary,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         )

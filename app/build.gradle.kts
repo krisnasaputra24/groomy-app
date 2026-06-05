@@ -15,15 +15,27 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        
+        // Membatasi arsitektur HP hanya untuk ARM (HP Modern)
+        // Ini akan menghapus library x86 (Emulator) yang sangat berat dari Select TF Ops
+        ndk {
+            abiFilters.add("arm64-v8a")
+            abiFilters.add("armeabi-v7a")
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        debug {
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
     
@@ -38,20 +50,24 @@ android {
 
     androidResources {
         noCompress += "tflite"
+        localeFilters += "en"
+        localeFilters += "id"
     }
     packaging {
         jniLibs {
             useLegacyPackaging = true
+            // Pastikan tidak ada duplikasi library native
+            excludes += "**/libtensorflowlite_jni.so"
+            excludes += "**/libtensorflowlite_flex_jni.so"
         }
         resources {
-            pickFirsts += "lib/x86/libtensorflowlite_jni.so"
-            pickFirsts += "lib/x86_64/libtensorflowlite_jni.so"
-            pickFirsts += "lib/armeabi-v7a/libtensorflowlite_jni.so"
-            pickFirsts += "lib/arm64-v8a/libtensorflowlite_jni.so"
-            pickFirsts += "lib/x86/libtensorflowlite_flex_jni.so"
-            pickFirsts += "lib/x86_64/libtensorflowlite_flex_jni.so"
-            pickFirsts += "lib/armeabi-v7a/libtensorflowlite_flex_jni.so"
-            pickFirsts += "lib/arm64-v8a/libtensorflowlite_flex_jni.so"
+            // Hapus duplikasi dan library yang tidak perlu untuk mengecilkan ukuran APK
+            excludes += "lib/x86/*"
+            excludes += "lib/x86_64/*"
+            excludes += "META-INF/*.kotlin_module"
+            excludes += "META-INF/DEPENDENCIES"
+            pickFirsts += "lib/**/libtensorflowlite_jni.so"
+            pickFirsts += "lib/**/libtensorflowlite_flex_jni.so"
         }
     }
 }
@@ -73,11 +89,10 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
-    implementation("androidx.compose.material:material-icons-extended")
+    implementation(libs.androidx.compose.material.icons.extended)
     // Retrofit untuk koneksi API
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.11.0")
     // Logging untuk melihat error di Logcat
     implementation("com.squareup.okhttp3:logging-interceptor:4.11.0")
 
@@ -91,5 +106,4 @@ dependencies {
     implementation("org.tensorflow:tensorflow-lite:2.16.1")
     implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1") // TAMBAHKAN INI
     implementation("org.tensorflow:tensorflow-lite-support-api:0.4.4")
-    implementation(libs.tensorflow.lite.metadata)
 }

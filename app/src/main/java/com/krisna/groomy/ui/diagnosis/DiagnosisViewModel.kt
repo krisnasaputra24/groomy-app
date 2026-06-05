@@ -29,7 +29,7 @@ class DiagnosisViewModel(
             _uiState.update { it.copy(isLoading = true, isResultVisible = false) }
             
             val result = classifier.classify(input)
-            Log.d("DiagnosisViewModel", "Classifier Result: Label=${result.label}, Confidence=${result.confidence}, Raw=${result.rawScore}")
+            Log.d("DiagnosisViewModel", "Classifier Result: Label=${result.label}, Confidence=${result.confidence}")
             
             if (result.label.startsWith("Error")) {
                 _uiState.update { 

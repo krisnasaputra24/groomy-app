@@ -18,8 +18,7 @@ class KeluhanClassifier(context: Context) {
 
     data class ClassificationResult(
         val label: String,
-        val confidence: Float,
-        val rawScore: Float = 0f
+        val confidence: Float
     )
 
     init {
@@ -32,13 +31,13 @@ class KeluhanClassifier(context: Context) {
             val declaredLength = fileDescriptor.length
             val modelBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
 
-            // 2. Inisialisasi FlexDelegate secara EKSPLISIT (Solusi Utama Error READ_VARIABLE)
+            // 2. Inisialisasi FlexDelegate
             flexDelegate = FlexDelegate()
             
             val options = Interpreter.Options().apply {
                 addDelegate(flexDelegate)
                 setNumThreads(4)
-                setUseXNNPACK(false) // WAJIB false saat menggunakan Flex/READ_VARIABLE
+                setUseXNNPACK(false)
             }
             
             interpreter = Interpreter(modelBuffer, options)
@@ -48,12 +47,13 @@ class KeluhanClassifier(context: Context) {
             val tempVocab = mutableMapOf<String, Int>()
             context.assets.open("vocab.txt").bufferedReader().useLines { lines ->
                 lines.forEachIndexed { index, word ->
+                    // Index 0 adalah padding (baris kosong di vocab.txt)
                     val clean = word.trim().lowercase()
-                    if (clean.isNotEmpty()) tempVocab[clean] = index
+                    tempVocab[clean] = index
                 }
             }
             vocab = tempVocab
-            Log.d("KeluhanClassifier", "FlexDelegate initialized and Model loaded.")
+            Log.d("KeluhanClassifier", "Model & Vocab loaded. Labels: ${labels.size}, Vocab: ${vocab.size}")
         } catch (e: Exception) {
             Log.e("KeluhanClassifier", "CRITICAL ERROR: ${e.message}")
         }
@@ -63,64 +63,37 @@ class KeluhanClassifier(context: Context) {
         val currentInterpreter = interpreter ?: return ClassificationResult("Model Error", 0f)
         
         return try {
-            val inputIds = IntArray(MAX_LEN) { 0 }
+            // Sesuai dtype: numpy.float32
+            val inputIds = FloatArray(MAX_LEN) { 0f }
             val words = text.lowercase()
                 .replace(Regex("[^a-z\\s]"), "")
                 .split(" ")
                 .filter { it.isNotBlank() }
 
             for (i in 0 until minOf(words.size, MAX_LEN)) {
-                inputIds[i] = vocab[words[i]] ?: 0
+                inputIds[i] = (vocab[words[i]] ?: 1).toFloat() 
             }
 
-            // Input: [1, 50], Output: Dinamis sesuai model
-            val outputShape = currentInterpreter.getOutputTensor(0).shape() // contoh: [1, 30]
-            val outputSize = outputShape[1]
+            // Input: [1, 50], Output: [1, 30]
             val inputBuffer = arrayOf(inputIds)
-            val outputBuffer = Array(1) { FloatArray(outputSize) }
+            val outputBuffer = Array(1) { FloatArray(30) }
 
             currentInterpreter.run(inputBuffer, outputBuffer)
 
-            val rawResults = outputBuffer[0]
-            
-            // Cari index dengan nilai MENTAH tertinggi terlebih dahulu
-            val maxIdx = rawResults.indices.maxByOrNull { rawResults[it] } ?: 0
-            
-            // Baru hitung softmax untuk mendapatkan persentase yang manusiawi
-            val probabilities = softmax(rawResults)
-            val maxScore = probabilities[maxIdx]
+            val results = outputBuffer[0]
+            val maxIdx = results.indices.maxByOrNull { results[it] } ?: 0
+            val maxScore = results[maxIdx]
 
-            Log.d("KeluhanClassifier", "MaxIdx: $maxIdx, RawScore: ${rawResults[maxIdx]}, Prob: $maxScore, Label: ${labels.getOrNull(maxIdx)}")
+            Log.d("KeluhanClassifier", "Result Index: $maxIdx, Score: $maxScore, Label: ${labels.getOrNull(maxIdx)}")
 
             ClassificationResult(
                 label = labels.getOrElse(maxIdx) { "unknown" },
-                confidence = maxScore,
-                rawScore = rawResults[maxIdx]
+                confidence = maxScore
             )
         } catch (e: Exception) {
             Log.e("KeluhanClassifier", "Inference Failed: ${e.message}")
             ClassificationResult("Error: ${e.localizedMessage}", 0f)
         }
-    }
-
-    private fun softmax(logits: FloatArray): FloatArray {
-        var maxLogit = Float.NEGATIVE_INFINITY
-        for (logit in logits) if (logit > maxLogit) maxLogit = logit
-        
-        var sum = 0f
-        val probabilities = FloatArray(logits.size)
-        for (i in logits.indices) {
-            probabilities[i] = kotlin.math.exp(logits[i] - maxLogit)
-            sum += probabilities[i]
-        }
-        
-        if (sum != 0f) {
-            for (i in probabilities.indices) {
-                probabilities[i] /= sum
-            }
-        }
-        
-        return probabilities
     }
 
     fun close() {
