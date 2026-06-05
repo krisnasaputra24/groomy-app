@@ -34,7 +34,8 @@ fun History(navController: NavController) {
     val historyItems = remember { mutableStateListOf<OrderResponse>() }
     var isLoading by remember { mutableStateOf(true) }
     
-    val ratedBookings = remember { mutableStateMapOf<Int, Boolean>() }
+    // Trigger recomposition when rating changes
+    var ratingCount by remember { mutableIntStateOf(0) }
 
     fun fetchHistory() {
         val token = prefManager.getToken()
@@ -90,8 +91,11 @@ fun History(navController: NavController) {
                 items(historyItems) { order ->
                     HistoryItemCard(
                         order = order,
-                        isRated = ratedBookings[order.id] ?: false,
-                        onRateSuccess = { ratedBookings[order.id] = true },
+                        isRated = prefManager.isOrderRated(order.id),
+                        onRateSuccess = { 
+                            prefManager.setOrderRated(order.id)
+                            ratingCount++
+                        },
                         onChatClick = {
                             navController.navigate("chat/${order.id}/${order.groomerId}/${order.groomer?.name ?: "Groomer"}")
                         }

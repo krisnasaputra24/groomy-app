@@ -31,8 +31,14 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 
+import androidx.compose.ui.platform.LocalContext
+import com.krisna.groomy.utils.PrefManager
+
 @Composable
 fun SplashScreen(navController: NavHostController) {
+    val context = LocalContext.current
+    val prefManager = remember { PrefManager(context) }
+    
     // LaunchedEffect
     val scale = remember {Animatable(0.8f)}
     val alpha = remember {Animatable(0f)}
@@ -46,8 +52,13 @@ fun SplashScreen(navController: NavHostController) {
             targetValue = 1f,
             animationSpec = tween(durationMillis = 1000)
         )
-        delay(3000) // Tunda selama 3 detik
-        navController.navigate("login") {
+        delay(2000) // Tunda selama 2 detik
+        
+        // Cek apakah token ada untuk persistent login
+        val token = prefManager.getToken()
+        val destination = if (!token.isNullOrEmpty()) "home" else "login"
+        
+        navController.navigate(destination) {
             // Hapus SplashScreen dari backstack agar user tidak bisa kembali ke Splash
             popUpTo("splash") { inclusive = true }
         }

@@ -56,14 +56,12 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
-            // Pastikan tidak ada duplikasi library native
-            excludes += "**/libtensorflowlite_jni.so"
-            excludes += "**/libtensorflowlite_flex_jni.so"
+            // Jangan exclude library ini karena dibutuhkan oleh TensorFlow Lite Flex
+            // excludes += "**/libtensorflowlite_jni.so"
+            // excludes += "**/libtensorflowlite_flex_jni.so"
         }
         resources {
             // Hapus duplikasi dan library yang tidak perlu untuk mengecilkan ukuran APK
-            excludes += "lib/x86/*"
-            excludes += "lib/x86_64/*"
             excludes += "META-INF/*.kotlin_module"
             excludes += "META-INF/DEPENDENCIES"
             pickFirsts += "lib/**/libtensorflowlite_jni.so"

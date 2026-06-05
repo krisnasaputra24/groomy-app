@@ -18,6 +18,14 @@ class PrefManager(context: Context) {
         return prefs.getString(TOKEN_KEY, null)
     }
 
+    fun setOrderRated(orderId: Int) {
+        prefs.edit().putBoolean("rated_order_$orderId", true).apply()
+    }
+
+    fun isOrderRated(orderId: Int): Boolean {
+        return prefs.getBoolean("rated_order_$orderId", false)
+    }
+
     fun clear() {
         prefs.edit().clear().apply()
     }

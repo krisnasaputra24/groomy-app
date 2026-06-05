@@ -54,8 +54,9 @@ class KeluhanClassifier(context: Context) {
             }
             vocab = tempVocab
             Log.d("KeluhanClassifier", "Model & Vocab loaded. Labels: ${labels.size}, Vocab: ${vocab.size}")
-        } catch (e: Exception) {
-            Log.e("KeluhanClassifier", "CRITICAL ERROR: ${e.message}")
+        } catch (e: Throwable) {
+            Log.e("KeluhanClassifier", "CRITICAL ERROR loading model: ${e.message}")
+            e.printStackTrace()
         }
     }
 
@@ -63,18 +64,18 @@ class KeluhanClassifier(context: Context) {
         val currentInterpreter = interpreter ?: return ClassificationResult("Model Error", 0f)
         
         return try {
-            // Sesuai dtype: numpy.float32
-            val inputIds = FloatArray(MAX_LEN) { 0f }
+            // Sesuai error: Model mengharapkan INT32
+            val inputIds = IntArray(MAX_LEN) { 0 }
             val words = text.lowercase()
                 .replace(Regex("[^a-z\\s]"), "")
                 .split(" ")
                 .filter { it.isNotBlank() }
 
             for (i in 0 until minOf(words.size, MAX_LEN)) {
-                inputIds[i] = (vocab[words[i]] ?: 1).toFloat() 
+                inputIds[i] = (vocab[words[i]] ?: 1) 
             }
 
-            // Input: [1, 50], Output: [1, 30]
+            // Input: [1, 50] (INT32), Output: [1, 30] (FLOAT32)
             val inputBuffer = arrayOf(inputIds)
             val outputBuffer = Array(1) { FloatArray(30) }
 
